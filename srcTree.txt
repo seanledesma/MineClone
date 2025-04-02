@@ -1,0 +1,9 @@
+// Project structure
+├── main.c             // Entry point, game loop
+├── game.h/c           // Game state and main logic
+├── camera.h/c         // First-person camera controls
+├── world.h/c          // World/chunk management
+├── block.h/c          // Block definitions and rendering
+├── player.h/c         // Player state and controls
+├── renderer.h/c       // Rendering utilities
+└── utils.h/c          // Helper functions
