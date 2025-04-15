@@ -26,6 +26,16 @@ int main(void) {
     BlockType chunk[CHUNK_WIDTH][CHUNK_HEIGHT][CHUNK_DEPTH];
     memset(chunk, 0, sizeof(chunk));
 
+    Vector3 tempCubePos = { 0.0f };
+
+    Camera3D camera = { 0 };
+    camera.position = (Vector3) { 50.0f, 50.0f, 50.0f };
+    camera.target = (Vector3) { 0.0f, 32.0f, 0.0f };
+    camera.up = (Vector3) { 0.0f, 1.0f, 0.0f };
+    camera.fovy = 45.0f;
+    camera.projection = CAMERA_PERSPECTIVE;
+
+
     for(int x = 0; x < CHUNK_WIDTH; x++){
         for(int y = 0; y < CHUNK_HEIGHT; y++) {
             for(int z = 0; z < CHUNK_DEPTH; z++) {
@@ -43,22 +53,37 @@ int main(void) {
 
     //main game loop here
     while(!WindowShouldClose()) {
+    UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+
+        // if(IsKeyDown(KEY_W)) {
+        //     camera.position.z = camera.position.z - 1;
+        // }
+
+
+
         BeginDrawing();
             ClearBackground(RAYWHITE);
 
-            for(int x = 0; x < CHUNK_WIDTH; x++){
-                for(int y = 0; y < CHUNK_HEIGHT; y++) {
-                    for(int z = 0; z < CHUNK_DEPTH; z++) {
-                        if(chunk[x][y][z] == BLOCK_AIR) continue;
+            BeginMode3D(camera);
 
-                        if(chunk[x][y][z] == BLOCK_DIRT) {
-                            DrawCubeV((Vector3) {x / CHUNK_WIDTH, y / CHUNK_HEIGHT, z / CHUNK_DEPTH}, 
-                                    (Vector3) {10,10,10}, GREEN);
+                for(int x = 0; x < CHUNK_WIDTH; x++){
+                    for(int y = 0; y < CHUNK_HEIGHT; y++) {
+                        for(int z = 0; z < CHUNK_DEPTH; z++) {
+                            if(chunk[x][y][z] == BLOCK_AIR) continue;
+
+                            if(chunk[x][y][z] == BLOCK_DIRT) {
+                                DrawCubeV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKGREEN);
+                                DrawCubeWiresV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
+
+                            } else {
+                                DrawCubeV((Vector3) { x, y + 0.5f, z}, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                                DrawCubeWiresV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
+                            }
                         }
                     }
                 }
-            }
 
+            EndMode3D();
 
         EndDrawing();
     }
