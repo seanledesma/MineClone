@@ -51,18 +51,14 @@ int main(void) {
         }
     }
 
-    //main game loop here
+    DisableCursor();
+    SetTargetFPS(60);
     while(!WindowShouldClose()) {
-    UpdateCamera(&camera, CAMERA_FIRST_PERSON);
-
-        // if(IsKeyDown(KEY_W)) {
-        //     camera.position.z = camera.position.z - 1;
-        // }
-
+        UpdateCamera(&camera, CAMERA_FIRST_PERSON);
 
 
         BeginDrawing();
-            ClearBackground(RAYWHITE);
+            ClearBackground(BLUE);
 
             BeginMode3D(camera);
 
@@ -70,6 +66,19 @@ int main(void) {
                     for(int y = 0; y < CHUNK_HEIGHT; y++) {
                         for(int z = 0; z < CHUNK_DEPTH; z++) {
                             if(chunk[x][y][z] == BLOCK_AIR) continue;
+
+                            if(x > 0 && x < CHUNK_WIDTH - 1 && y > 0 && y < CHUNK_HEIGHT - 1 && z > 0 && z < CHUNK_DEPTH - 1) {
+                                if(chunk[x-1][y][z] != BLOCK_AIR && 
+                                    chunk[x+1][y][z] != BLOCK_AIR && 
+                                    chunk[x][y-1][z] != BLOCK_AIR && 
+                                    chunk[x][y+1][z] != BLOCK_AIR && 
+                                    chunk[x][y][z-1] != BLOCK_AIR && 
+                                    chunk[x][y][z+1] != BLOCK_AIR)
+                                    {
+                                        continue;
+                                    }
+                            }
+                            
 
                             if(chunk[x][y][z] == BLOCK_DIRT) {
                                 DrawCubeV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKGREEN);
@@ -84,7 +93,7 @@ int main(void) {
                 }
 
             EndMode3D();
-
+            DrawFPS(10, 10);
         EndDrawing();
     }
 
