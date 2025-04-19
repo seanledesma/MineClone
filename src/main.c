@@ -15,10 +15,13 @@
 
 #define screenWidth 2000
 #define screenHeight 1050
+//#define EYE_LEVEL player.height * 0.9;
 // starting with smaller chunk sizes, can change later
 const int CHUNK_WIDTH = 16;
 const int CHUNK_HEIGHT = 64;
 const int CHUNK_DEPTH = 16;
+
+const float GRAVITY = -9.8f;
 
 typedef enum {
     BLOCK_AIR = 0,
@@ -35,12 +38,17 @@ typedef struct {
 } Chunk;
 
 typedef struct{
-
+    bool isOnGround;
+    Vector3 position;
+    Vector3 velocity;
+    float height;
 } Player;
 
 // PROTOTYPES
 void InitializeChunk(Chunk* chunk);
 bool IsBlockVisible(Chunk*, int x, int y, int z);
+void UpdatePlayer(Player* player, Camera3D* camera, Chunk* chunk, float deltaTime);
+Vector3 BlockSelector(Camera3D camera, Chunk* chunk);
 
 
 
@@ -58,9 +66,16 @@ int main(void) {
 
     Vector3 tempCubePos = { 0.0f };
 
+    Player player = {
+        .isOnGround = false,
+        .position = (Vector3) { 0.0f, 60.0f, 5.0f },
+        .velocity = (Vector3) { 0 },
+        .height = 2.0f,
+    };
+
     Camera3D camera = { 0 };
-    camera.position = (Vector3) { 50.0f, 50.0f, 50.0f };
-    camera.target = (Vector3) { 0.0f, 32.0f, 0.0f };
+    camera.position = (Vector3) { player.position.x, player.position.y + player.height * 0.9f, player.position.z };
+    camera.target = (Vector3) { 0.0f, 0.0f, 0.0f };
     camera.up = (Vector3) { 0.0f, 1.0f, 0.0f };
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
@@ -68,10 +83,15 @@ int main(void) {
 
 
 
+
+
     DisableCursor();
     SetTargetFPS(60);
     while(!WindowShouldClose()) {
-        UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+        float deltaTime = GetFrameTime();
+        //UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+
+        UpdatePlayer(&player, &camera, &chunk, deltaTime);
 
 
         BeginDrawing();
@@ -102,6 +122,10 @@ int main(void) {
                 }
 
             EndMode3D();
+
+            DrawText(TextFormat("player pos: X: %.2f Y: %.2f Z: %.2f",
+                                player.position.x, player.position.y, player.position.z),
+                                300, 10, 20, RAYWHITE);
             DrawFPS(10, 10);
         EndDrawing();
     }
@@ -144,11 +168,59 @@ bool IsBlockVisible(Chunk* chunk, int x, int y, int z) {
             chunk->blocks[x][y-1][z] != BLOCK_AIR && 
             chunk->blocks[x][y+1][z] != BLOCK_AIR && 
             chunk->blocks[x][y][z-1] != BLOCK_AIR && 
-            chunk->blocks[x][y][z+1] != BLOCK_AIR)
-            {
+            chunk->blocks[x][y][z+1] != BLOCK_AIR) {
                 return false;
-            }
+        }
+    }
+    return true;
+}
+
+void UpdatePlayer(Player* player, Camera3D* camera, Chunk* chunk, float deltaTime) {
+    UpdateCamera(camera, CAMERA_FIRST_PERSON);
+    player->position.x = camera->position.x;
+    player->position.z = camera->position.z;
+    //camera->position = (Vector3) { player->position.x, player->position.y + 1.8, player->position.x };
+
+    //next, need to figure out what block we are over, and if we are right on top of it
+    Vector3 floorBlock = { 0 };
+    for(int i = (int) player->position.y; i >= 0; i--) {
+        //TODO: MAKE SURE WE ARE ONLY PASSING THE CURRENT CHUNK TO THIS FUNC
+        // bugs could come from all this type casting :( watch out)
+        if(player->position.x > CHUNK_WIDTH || player->position.x < 0 || player->position.z > CHUNK_DEPTH || player->position.z < 0) {
+            //if we went off the chunk, (this will probably need to change when we add more chunks)
+            player->isOnGround = false;
+        } else if(chunk->blocks[(int) player->position.x][(int) player->position.y][(int) player->position.z] != BLOCK_AIR) {
+            floorBlock = (Vector3) { player->position.x, (float) i, player->position.z };
+            break;
+        }
+    }
+    //update if player has hit the floor block
+    if(player->position.y <= floorBlock.y + 1) {
+        //if player pos is any block but air, we are on ground
+        player->isOnGround = true;             
+        //next, we need to set camera 1.8 blocks about pos
+        
+    }else{
+        player->isOnGround = false;
+    }
+    //jumping
+    if(IsKeyPressed(KEY_SPACE) && player->isOnGround) {
+        player->velocity.y = 5.0f;
+        player->isOnGround = false;
     }
 
-    return true;
+    //if player is in the air, fall down. (may update this to add free mode)
+    if(player->isOnGround) {
+       player->velocity.y = 0; 
+    } else {
+        player->velocity.y += GRAVITY * deltaTime;
+    }
+
+    player->position.y += player->velocity.y * deltaTime;
+    camera->position.y = player->position.y + player->height * 0.9f;
+
+}
+
+Vector3 BlockSelector(Camera3D camera, Chunk* chunk) {
+    
 }
