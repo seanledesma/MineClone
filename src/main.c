@@ -11,6 +11,7 @@
 
 //basic window
 #include "raylib.h" 
+#include "raymath.h"
 #include <string.h>
 
 #define screenWidth 2000
@@ -46,9 +47,9 @@ typedef struct{
 
 // PROTOTYPES
 void InitializeChunk(Chunk* chunk);
-bool IsBlockVisible(Chunk*, int x, int y, int z);
+bool IsBlockVisible(Chunk*, int* x, int* y, int* z);
 void UpdatePlayer(Player* player, Camera3D* camera, Chunk* chunk, float deltaTime);
-Vector3 BlockSelector(Camera3D camera, Chunk* chunk);
+bool BlockSelector(Camera3D* camera, Chunk* chunk, Vector3 *hitPos);
 
 
 
@@ -88,6 +89,12 @@ int main(void) {
     DisableCursor();
     SetTargetFPS(60);
     while(!WindowShouldClose()) {
+        if(IsKeyPressed(KEY_F1))
+            EnableCursor();
+        if(IsKeyPressed(KEY_F2))
+            DisableCursor();
+
+
         float deltaTime = GetFrameTime();
         //UpdateCamera(&camera, CAMERA_FIRST_PERSON);
 
@@ -103,25 +110,35 @@ int main(void) {
                     for(int y = 0; y < CHUNK_HEIGHT; y++) {
                         for(int z = 0; z < CHUNK_DEPTH; z++) {
                             //if block is NOT visible, skip that particular block (function will return T or F)
-                            if(IsBlockVisible(&chunk, x, y, z) == false) continue;
+                            if(IsBlockVisible(&chunk, &x, &y, &z) == false) continue;
 
                             
 
                             if(chunk.blocks[x][y][z] == BLOCK_GRASS) {
                                 DrawCubeV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKGREEN);
-                                DrawCubeWiresV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
+                                //DrawCubeWiresV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
                             }else if(chunk.blocks[x][y][z] == BLOCK_DIRT) {
                                 DrawCubeV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKBROWN);
-                                DrawCubeWiresV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
+                                //DrawCubeWiresV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
                             }else {
                                 DrawCubeV((Vector3) { x, y + 0.5f, z}, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKGRAY);
-                                DrawCubeWiresV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
+                                //DrawCubeWiresV((Vector3) { x, y + 0.5f, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
                             }
                         }
                     }
                 }
 
+                Vector3 rayHitPos;
+                if(BlockSelector(&camera, &chunk, &rayHitPos)) {
+                    DrawCubeWiresV((Vector3){ rayHitPos.x, rayHitPos.y + 0.5f, rayHitPos.z}, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
+                }
+
             EndMode3D();
+
+            //DrawRectangle(screenWidth / 2 - 20, screenHeight / 2 - 5, 40, 10, WHITE);
+            // DrawRectangle(screenWidth / 2 - 5, screenHeight / 2 - 20, 10, 40, WHITE);
+            DrawLine(GetScreenWidth() / 2, GetScreenHeight() / 2 - 10, GetScreenWidth() / 2, GetScreenHeight() / 2 + 10, WHITE);
+            DrawLine(GetScreenWidth() / 2 - 10, GetScreenHeight() / 2, GetScreenWidth() / 2 + 10, GetScreenHeight() / 2, WHITE);
 
             DrawText(TextFormat("player pos: X: %.2f Y: %.2f Z: %.2f",
                                 player.position.x, player.position.y, player.position.z),
@@ -158,17 +175,17 @@ void InitializeChunk(Chunk* chunk) {
     }
 }
 //should probably look into ways to only render block faces facing air, instead of whole block even if only one side touches air
-bool IsBlockVisible(Chunk* chunk, int x, int y, int z) {
+bool IsBlockVisible(Chunk* chunk, int* x, int* y, int* z) {
     //all air blocks are invisible, so return false
-    if(chunk->blocks[x][y][z] == BLOCK_AIR) return false;
+    if(chunk->blocks[*x][*y][*z] == BLOCK_AIR) return false;
     //if the block is not an outside block AND block isn't touching air, return false
-    if(x > 0 && x < CHUNK_WIDTH - 1 && y > 0 && y < CHUNK_HEIGHT - 1 && z > 0 && z < CHUNK_DEPTH - 1) {
-        if(chunk->blocks[x-1][y][z] != BLOCK_AIR && 
-            chunk->blocks[x+1][y][z] != BLOCK_AIR && 
-            chunk->blocks[x][y-1][z] != BLOCK_AIR && 
-            chunk->blocks[x][y+1][z] != BLOCK_AIR && 
-            chunk->blocks[x][y][z-1] != BLOCK_AIR && 
-            chunk->blocks[x][y][z+1] != BLOCK_AIR) {
+    if(*x > 0 && *x < CHUNK_WIDTH - 1 && *y > 0 && *y < CHUNK_HEIGHT - 1 && *z > 0 && *z < CHUNK_DEPTH - 1) {
+        if(chunk->blocks[*x-1][*y][*z] != BLOCK_AIR && 
+            chunk->blocks[*x+1][*y][*z] != BLOCK_AIR && 
+            chunk->blocks[*x][*y-1][*z] != BLOCK_AIR && 
+            chunk->blocks[*x][*y+1][*z] != BLOCK_AIR && 
+            chunk->blocks[*x][*y][*z-1] != BLOCK_AIR && 
+            chunk->blocks[*x][*y][*z+1] != BLOCK_AIR) {
                 return false;
         }
     }
@@ -221,6 +238,25 @@ void UpdatePlayer(Player* player, Camera3D* camera, Chunk* chunk, float deltaTim
 
 }
 
-Vector3 BlockSelector(Camera3D camera, Chunk* chunk) {
-    
+bool BlockSelector(Camera3D* camera, Chunk* chunk, Vector3* hitPos) {
+    Vector3 rayOrigin = camera->position;
+    Vector3 rayDir = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+
+    float maxDistance = 8.0f;
+    float step = 0.1f; //how fine (?) to step through space, how frequent we are checking if we hit
+
+    for (float t = 0; t  < maxDistance; t += step) {
+        Vector3 point = Vector3Add(rayOrigin, Vector3Scale(rayDir, t));
+
+        int blockX = (int)floor(point.x);
+        int blockY = (int)floor(point.y);
+        int blockZ = (int)floor(point.z);
+
+        if(IsBlockVisible(chunk, &blockX, &blockY, &blockZ)) {
+            *hitPos = (Vector3) { blockX, blockY, blockZ };
+            return true;
+        }
+    }
+
+    return false;
 }
