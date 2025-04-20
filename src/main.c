@@ -4,11 +4,6 @@
 *
 */
 
-
-
-
-
-
 //basic window
 #include "raylib.h" 
 #include "raymath.h"
@@ -42,14 +37,20 @@ typedef struct{
     bool isOnGround;
     Vector3 position;
     Vector3 velocity;
+    Vector3 lookDirection;
     float height;
 } Player;
+
+typedef struct {
+    float yaw;
+    float pitch;
+} CameraController;
 
 // PROTOTYPES
 void InitializeChunk(Chunk* chunk);
 bool IsBlockVisible(Chunk*, int* x, int* y, int* z);
-void UpdatePlayer(Player* player, Camera3D* camera, Chunk* chunk, float deltaTime);
-bool BlockSelector(Camera3D* camera, Chunk* chunk, Vector3 *hitPos);
+void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime);
+bool RaycastBlock(Vector3 origin, Player* player, Chunk* chunk, Vector3 *hitPos);
 
 
 
@@ -72,6 +73,7 @@ int main(void) {
         .position = (Vector3) { 0.0f, 60.0f, 5.0f },
         .velocity = (Vector3) { 0 },
         .height = 2.0f,
+        .lookDirection = (Vector3) { 0.0f, 0.0f, 0.0f },
     };
 
     Camera3D camera = { 0 };
@@ -81,7 +83,7 @@ int main(void) {
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
-
+    CameraController camCtrl = { 0 };
 
 
 
@@ -98,7 +100,7 @@ int main(void) {
         float deltaTime = GetFrameTime();
         //UpdateCamera(&camera, CAMERA_FIRST_PERSON);
 
-        UpdatePlayer(&player, &camera, &chunk, deltaTime);
+        UpdatePlayer(&player, &camera, &camCtrl, &chunk, deltaTime);
 
 
         BeginDrawing();
@@ -127,11 +129,17 @@ int main(void) {
                         }
                     }
                 }
-
                 Vector3 rayHitPos;
-                if(BlockSelector(&camera, &chunk, &rayHitPos)) {
+                if(RaycastBlock(camera.position, &player, &chunk, &rayHitPos)) {
                     DrawCubeWiresV((Vector3){ rayHitPos.x, rayHitPos.y + 0.5f, rayHitPos.z}, (Vector3) { 1.0f, 1.0f, 1.0f }, WHITE);
                 }
+                // Vector3 rayEnd = Vector3Add(camera.position, Vector3Scale(player.lookDirection, 2.0f));  // Shorter line for testing
+                // DrawLine3D(camera.position, rayEnd, RED);
+
+                Vector3 rayEnd = Vector3Add(camera.position, Vector3Scale(player.lookDirection, 8.0f));  // Multiply by a reasonable distance
+
+                DrawLine3D(camera.position, rayEnd, RED);
+
 
             EndMode3D();
 
@@ -192,21 +200,54 @@ bool IsBlockVisible(Chunk* chunk, int* x, int* y, int* z) {
     return true;
 }
 
-void UpdatePlayer(Player* player, Camera3D* camera, Chunk* chunk, float deltaTime) {
-    UpdateCamera(camera, CAMERA_FIRST_PERSON);
-    player->position.x = camera->position.x;
-    player->position.z = camera->position.z;
-    //camera->position = (Vector3) { player->position.x, player->position.y + 1.8, player->position.x };
+void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime) {
+    //I'll be honest, the next little bit that has to do w/ camCtrl chatGPT helped me with :)
+    // setting up mouse look
+    Vector2 mouseDelta = GetMouseDelta();
+    float sensitivity = 0.003f;
+    camCtrl->yaw -= mouseDelta.x * sensitivity;
+    camCtrl->pitch -= mouseDelta.y * sensitivity;
+
+    //clamp pitch so we can't flip over
+    const float pitchLimit = PI/2.0f - 0.01f;
+    if (camCtrl->pitch > pitchLimit) camCtrl->pitch = pitchLimit;
+    if (camCtrl->pitch < -pitchLimit) camCtrl->pitch = -pitchLimit;
+
+    //get look direction
+    player->lookDirection = (Vector3) {
+        cosf(camCtrl->pitch) * sinf(camCtrl->yaw),
+        sinf(camCtrl->pitch),
+        cosf(camCtrl->pitch) * cosf(camCtrl->yaw)
+    };
+
+    // basic movement
+    Vector3 forward = { player->lookDirection.x, 0.0f, player->lookDirection.z };
+    Vector3 right = { -forward.z, 0.0f, forward.x };
+    Vector3 move = Vector3Zero();
+    float speed = 5.0f;
+
+    if (IsKeyDown(KEY_W)) move = Vector3Add(move, forward);
+    if (IsKeyDown(KEY_S)) move = Vector3Subtract(move, forward);
+    if (IsKeyDown(KEY_A)) move = Vector3Subtract(move, right);
+    if (IsKeyDown(KEY_D)) move = Vector3Add(move, right);
+
+    if (Vector3Length(move) > 0.0f)
+        move = Vector3Scale(Vector3Normalize(move), speed * deltaTime);
+    
+    player->position = Vector3Add(player->position, move);
+
 
     //next, need to figure out what block we are over, and if we are right on top of it
     Vector3 floorBlock = { 0 };
     for(int i = (int) player->position.y; i >= 0; i--) {
         //TODO: MAKE SURE WE ARE ONLY PASSING THE CURRENT CHUNK TO THIS FUNC
         // bugs could come from all this type casting :( watch out)
-        if(player->position.x > CHUNK_WIDTH || player->position.x < 0 || player->position.z > CHUNK_DEPTH || player->position.z < 0) {
+        if(player->position.x >= CHUNK_WIDTH || player->position.x < 0 || 
+            player->position.z >= CHUNK_DEPTH || player->position.z < 0) {
             //if we went off the chunk, (this will probably need to change when we add more chunks)
             player->isOnGround = false;
-        } else if(chunk->blocks[(int) player->position.x][(int) player->position.y][(int) player->position.z] != BLOCK_AIR) {
+            break;
+        } else if(chunk->blocks[(int) player->position.x][i][(int) player->position.z] != BLOCK_AIR) {
             floorBlock = (Vector3) { player->position.x, (float) i, player->position.z };
             break;
         }
@@ -216,7 +257,6 @@ void UpdatePlayer(Player* player, Camera3D* camera, Chunk* chunk, float deltaTim
         //if player pos is any block but air, we are on ground
         player->isOnGround = true;             
         //next, we need to set camera 1.8 blocks about pos
-        
     }else{
         player->isOnGround = false;
     }
@@ -234,26 +274,42 @@ void UpdatePlayer(Player* player, Camera3D* camera, Chunk* chunk, float deltaTim
     }
 
     player->position.y += player->velocity.y * deltaTime;
-    camera->position.y = player->position.y + player->height * 0.9f;
+    camera->position = (Vector3) { 
+        player->position.x, 
+        player->position.y + player->height * 0.9f,
+        player->position.z
+    };
+    camera->target = Vector3Add(camera->position, player->lookDirection);
+    camera->up = (Vector3) { 0.0f, 1.0f, 0.0f };
 
 }
 
-bool BlockSelector(Camera3D* camera, Chunk* chunk, Vector3* hitPos) {
-    Vector3 rayOrigin = camera->position;
-    Vector3 rayDir = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+bool RaycastBlock(Vector3 rayOrigin, Player* player, Chunk* chunk, Vector3 *hitPos) {
 
     float maxDistance = 8.0f;
-    float step = 0.1f; //how fine (?) to step through space, how frequent we are checking if we hit
+    float stepSize = 0.1f; //how fine (?) to step through space, how frequent we are checking if we hit
+    player->lookDirection = Vector3Normalize(player->lookDirection); // debuggin, but probably needed?
 
-    for (float t = 0; t  < maxDistance; t += step) {
-        Vector3 point = Vector3Add(rayOrigin, Vector3Scale(rayDir, t));
 
-        int blockX = (int)floor(point.x);
-        int blockY = (int)floor(point.y);
-        int blockZ = (int)floor(point.z);
+    for (float t = 0; t  < maxDistance; t += stepSize) {
+        Vector3 point = Vector3Add(rayOrigin, Vector3Scale(player->lookDirection, t));
+
+        //get more precision
+        Vector3 backstep = Vector3Scale(player->lookDirection, 0.01f);
+        Vector3 testPoint = Vector3Subtract(point, backstep);
+
+        int blockX = (int)floor(testPoint.x);
+        int blockY = (int)floor(testPoint.y);
+        int blockZ = (int)floor(testPoint.z);
+
+        if(blockX < 0 || blockX >= CHUNK_WIDTH || 
+            blockY < 0 || blockY >= CHUNK_HEIGHT || 
+            blockZ < 0 || blockZ >= CHUNK_DEPTH) return false;
+
 
         if(IsBlockVisible(chunk, &blockX, &blockY, &blockZ)) {
             *hitPos = (Vector3) { blockX, blockY, blockZ };
+            //may want to calculate hitNormal in the future to know which face was hit
             return true;
         }
     }
