@@ -1,7 +1,8 @@
 /*
 *   TODO:
 *       - figure out how to make camera behave like a player, gravity, etc
-*
+*       - working on wall collision
+*       - actually, working on figuring out y height but, should be at pos 0 on floor
 */
 
 //basic window
@@ -222,7 +223,7 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
 
     //next, need to figure out what block we are over, and if we are right on top of it
     Vector3 floorBlock = { 0 };
-    for(int i = (int) player->position.y; i >= 0; i--) {
+    for(int i = (int) floor(player->position.y); i >= 0; i--) {
         //TODO: MAKE SURE WE ARE ONLY PASSING THE CURRENT CHUNK TO THIS FUNC
         // bugs could come from all this type casting :( watch out)
         if(player->position.x >= CHUNK_WIDTH || player->position.x < 0 || 
@@ -230,14 +231,15 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
             //if we went off the chunk, (this will probably need to change when we add more chunks)
             player->isOnGround = false;
             break;
-        } else if(chunk->blocks[(int) player->position.x][i][(int) player->position.z] != BLOCK_AIR) {
-            floorBlock = (Vector3) { player->position.x, (float) i, player->position.z };
+        } else if(chunk->blocks[(int) floor(player->position.x)][i][(int) floor(player->position.z)] != BLOCK_AIR) {
+            floorBlock = (Vector3) { floor(player->position.x), (float) i, floor(player->position.z) };
+            player->position.y = floorBlock.y;
             break;
         }
     }
     //update if player has hit the floor block
     //SOMETHING WEIRD GOING ON HERE
-    if((int) player->position.y <= (int) floorBlock.y) {
+    if(player->position.y <= floorBlock.y) {
         //if player pos is any block but air, we are on ground
         player->isOnGround = true;             
         //next, we need to set camera 1.8 blocks about pos
@@ -253,6 +255,7 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
     //if player is in the air, fall down. (may update this to add free mode)
     if(player->isOnGround) {
        player->velocity.y = 0; 
+       player->position.y = floorBlock.y;
     } else {
         player->velocity.y += GRAVITY * deltaTime;
         player->position.y += player->velocity.y * deltaTime;
