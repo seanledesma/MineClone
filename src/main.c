@@ -59,6 +59,7 @@ void InitializeChunk(Chunk* chunk);
 bool IsBlockVisible(Chunk*, int x, int y, int z);
 void SetLookDirection(CameraController* camCtrl);
 void CastRay(Camera3D camera, Player* player, Chunk* chunk);
+float GetGroundY(Vector3 pos, Chunk* chunk);
 bool CheckOnGround(Player* player, Chunk* chunk);
 void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime);
 
@@ -160,8 +161,8 @@ int main(void) {
             }
 
             //debugging player position
-            DrawText(TextFormat("player pos: X: %.2f Y: %.2f Z: %.2f",
-                                player.position.x, player.position.y, player.position.z),
+            DrawText(TextFormat("player pos: X: %.2f Y: %.2f FootY: %.2f Z: %.2f",
+                                player.position.x, player.position.y, player.position.y - (player.height * 0.5f), player.position.z),
                                 300, 10, 20, RAYWHITE);
 
             DrawFPS(10, 10);
@@ -277,29 +278,25 @@ float GetGroundY(Vector3 pos, Chunk* chunk) {
     if(blockZ < 0) blockZ = 0;
     if(blockZ >= CHUNK_DEPTH) blockZ = CHUNK_DEPTH - 1;
 
-    for(int y = CHUNK_HEIGHT - 1; y >= 0; y--) {
+    for(int y = (int)floor(pos.y); y >= 0; y--) {
         if(chunk->blocks[blockX][y][blockZ] != BLOCK_AIR) {
             return (float) y + 1.0f;
         }
     }
-
+    //no block found means i'm over void, snap to y = 0;
+    return 0.0f;
 }
 
 bool CheckOnGround(Player* player, Chunk* chunk) {
-    // player's pos is in center of player, so get feed by subtracting half of player
-    // we subtract 0.01 just to push us into the next block's pos
-    float footY = player->nextPosition.y - (player->height * 0.5f) - 0.01f;
+    float footY = player->nextPosition.y - (player->height * 0.5f);
 
-    int x = (int)floor(player->nextPosition.x);
-    int y = (int)floor(footY);
-    int z = (int)floor(player->nextPosition.z);
-    // may need to alter this when we add more chunks
-    if(x < 0 || x >= CHUNK_WIDTH ||
-       y < 0 || y >= CHUNK_HEIGHT ||
-       z < 0 || z >= CHUNK_DEPTH) { return false; }
-        
-    // if the block below us isn't air, we are on ground, return true, else false
-    return (chunk->blocks[x][y][z] != BLOCK_AIR);
+    float groundY = GetGroundY(player->nextPosition, chunk);
+
+    player->floorBlock = (Vector3) { player->nextPosition.x, groundY, player->nextPosition.z };
+
+    const float epsilon = 0.01f;
+
+    return (footY <= groundY + epsilon);
 
 }
 
@@ -321,7 +318,7 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
     }
 
 
-    // basic movement
+    // horizontal movement
     Vector3 forward = { camCtrl->direction.x, 0.0f, camCtrl->direction.z };
     Vector3 right = { -forward.z, 0.0f, forward.x };
     Vector3 move = Vector3Zero();
@@ -342,6 +339,7 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
     }
     player->velocity.y += GRAVITY * deltaTime;
 
+    //build next position
     player->nextPosition = player->position;
     player->nextPosition.x += move.x;
     player->nextPosition.z += move.z;
@@ -350,35 +348,36 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
 
 
     //if player is in the air, fall down. (may update this to add free mode)
-    if(CheckOnGround(player, chunk)) {
-        player->nextPosition = 
-        player->velocity.y = 0; 
-        player->nextPosition.y += player->velocity.y * deltaTime;
+    // float footY = player->nextPosition.y - (player->height * 0.5f);
+    // float groundY = GetGroundY(player->nextPosition, chunk);
+    // const float eps = 0.01f;
+
+    // if(footY <= groundY + eps) {
+    //     player->nextPosition.y = groundY + (player->height * 0.5f);
+    //     player->velocity.y = 0;
+    //     player->isOnGround = true;
+    // } else {
+    //     player->isOnGround = false;
+    // }
+
+    if(CheckOnGround(player, chunk)){
+        player->nextPosition.y = player->floorBlock.y + (player->height * 0.5f);
+        player->velocity.y = 0;
         player->isOnGround = true;
     } else {
-        player->velocity.y += GRAVITY * deltaTime;
-        player->nextPosition.y += player->velocity.y * deltaTime;
         player->isOnGround = false;
     }
 
 
-
-
-
-
     // figuring out wall collision
-    // if (chunk->blocks[(int)player->nextPosition.x][(int)player->nextPosition.y][(int)player->nextPosition.z] == BLOCK_AIR) {
-    //     player->position = player->nextPosition;
-    // }    
-    // player->position.x = player->nextPosition.x;
-    // player->position.z = player->nextPosition.z;
-    player->position = player->nextPosition;
+    // could make this better buy making a radius around player pos, checking that rather than the single player pos point
+    if (chunk->blocks[(int)player->nextPosition.x][(int)player->nextPosition.y][(int)player->nextPosition.z] == BLOCK_AIR) {
+        player->position = player->nextPosition;
+    }    
 
-
-    
     camera->position = (Vector3) { 
         player->position.x, 
-        player->position.y + player->height * 0.9f,
+        player->position.y + player->height * 0.4f,
         player->position.z
     };
     camera->target = Vector3Add(camera->position, camCtrl->direction);
