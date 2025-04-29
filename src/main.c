@@ -3,6 +3,7 @@
 *   - add multiple chunks, world data
 *   - figure out tectures instead of cubes
 *   - also different ground height
+*   - and now need to expand wall collision logic
 */
 
 //basic window
@@ -14,12 +15,13 @@
 
 #define screenWidth 1200
 #define screenHeight 750
-//#define EYE_LEVEL player.height * 0.9;
+//#define EYE_LEVEL PLAYER_HEIGHT * 0.9;
 // starting with smaller chunk sizes, can change later
 const int CHUNK_WIDTH = 16;
 const int CHUNK_HEIGHT = 64;
 const int CHUNK_DEPTH = 16;
-
+const float PLAYER_HEIGHT = 2.0f;
+const float PLAYER_RADIUS = 0.2f;
 const float GRAVITY = -9.8f;
 
 typedef enum {
@@ -39,7 +41,6 @@ typedef struct {
 typedef struct{
     bool isOnGround;
     bool hasTargetBlock;
-    float height;
     Vector3 position;
     Vector3 nextPosition;
     Vector3 velocity;
@@ -91,7 +92,6 @@ int main(void) {
     Player player = {
         .isOnGround = false,
         .hasTargetBlock = false,
-        .height = 2.0f,
         .position = (Vector3) { 0.0f, 50.0f, 5.0f },
         .nextPosition = (Vector3) { 0.0f, 50.0f, 5.0f },
         .velocity = (Vector3) { 0 },
@@ -99,7 +99,7 @@ int main(void) {
     };
 
     Camera3D camera = { 0 };
-    camera.position = (Vector3) { player.position.x, player.position.y + player.height * 0.9f, player.position.z };
+    camera.position = (Vector3) { player.position.x, player.position.y + PLAYER_HEIGHT * 0.9f, player.position.z };
     camera.target = (Vector3) { 0.0f, 0.0f, 0.0f };
     camera.up = (Vector3) { 0.0f, 1.0f, 0.0f };
     camera.fovy = 45.0f;
@@ -178,7 +178,7 @@ int main(void) {
 
             //debugging player position
             DrawText(TextFormat("player pos: X: %.2f Y: %.2f FootY: %.2f Z: %.2f",
-                                player.position.x, player.position.y, player.position.y - (player.height * 0.5f), player.position.z),
+                                player.position.x, player.position.y, player.position.y - (PLAYER_HEIGHT * 0.5f), player.position.z),
                                 300, 10, 20, RAYWHITE);
 
             DrawFPS(10, 10);
@@ -304,7 +304,7 @@ float GetGroundY(Vector3 pos, Chunk* chunk) {
 }
 
 bool CheckOnGround(Player* player, Chunk* chunk) {
-    float footY = player->nextPosition.y - (player->height * 0.5f);
+    float footY = player->nextPosition.y - (PLAYER_HEIGHT / 2);
 
     float groundY = GetGroundY(player->nextPosition, chunk);
 
@@ -315,6 +315,7 @@ bool CheckOnGround(Player* player, Chunk* chunk) {
     return (footY <= groundY + epsilon);
 
 }
+
 
 void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime) {
     if(player->hasTargetBlock) {
@@ -332,8 +333,6 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
 
         }
     }
-
-
     // horizontal movement
     Vector3 forward = { camCtrl->direction.x, 0.0f, camCtrl->direction.z };
     Vector3 right = { -forward.z, 0.0f, forward.x };
@@ -364,12 +363,12 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
 
 
     //if player is in the air, fall down. (may update this to add free mode)
-    // float footY = player->nextPosition.y - (player->height * 0.5f);
+    // float footY = player->nextPosition.y - (PLAYER_HEIGHT * 0.5f);
     // float groundY = GetGroundY(player->nextPosition, chunk);
     // const float eps = 0.01f;
 
     // if(footY <= groundY + eps) {
-    //     player->nextPosition.y = groundY + (player->height * 0.5f);
+    //     player->nextPosition.y = groundY + (PLAYER_HEIGHT * 0.5f);
     //     player->velocity.y = 0;
     //     player->isOnGround = true;
     // } else {
@@ -377,7 +376,7 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
     // }
 
     if(CheckOnGround(player, chunk)){
-        player->nextPosition.y = player->floorBlock.y + (player->height * 0.5f);
+        player->nextPosition.y = player->floorBlock.y + (PLAYER_HEIGHT / 2);
         player->velocity.y = 0;
         player->isOnGround = true;
     } else {
@@ -385,15 +384,26 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
     }
 
 
-    // figuring out wall collision
-    // could make this better buy making a radius around player pos, checking that rather than the single player pos point
-    if (chunk->blocks[(int)player->nextPosition.x][(int)player->nextPosition.y][(int)player->nextPosition.z] == BLOCK_AIR) {
+    //figuring out wall collision
+    //could make this better buy making a radius around player pos, checking that rather than the single player pos point
+    int footY = (int)floorf(player->nextPosition.y - (PLAYER_HEIGHT / 2.0f) + 0.1f);
+    int bx = (int)floorf(player->nextPosition.x);
+    int bz = (int)floorf(player->nextPosition.z);
+    if (chunk->blocks[bx][footY][bz] == BLOCK_AIR) {
         player->position = player->nextPosition;
-    }    
+    }
+
+
+
+
+
+
+
 
     camera->position = (Vector3) { 
         player->position.x, 
-        player->position.y + player->height * 0.4f,
+        //player position is at CENTER of player, so at 1, plus almost a full block for eye level
+        player->position.y + PLAYER_HEIGHT * 0.4f,
         player->position.z
     };
     camera->target = Vector3Add(camera->position, camCtrl->direction);
@@ -401,7 +411,7 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
 
 }
 
-
+// yoinked from one of the Raylib examples
 void DrawCubeTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color)
 {
     float x = position.x;
