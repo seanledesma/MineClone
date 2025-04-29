@@ -1,13 +1,14 @@
 /*
 *   TODO:
-*       - figure out how to make camera behave like a player, gravity, etc
-*       - working on wall collision
-*       - actually, working on figuring out y height but, should be at pos 0 on floor
+*   - add multiple chunks, world data
+*   - figure out tectures instead of cubes
+*   - also different ground height
 */
 
 //basic window
 #include "raylib.h"
 #include "raymath.h"
+#include "rlgl.h"
 #include <string.h>
 #include <float.h>
 
@@ -62,6 +63,8 @@ void CastRay(Camera3D camera, Player* player, Chunk* chunk);
 float GetGroundY(Vector3 pos, Chunk* chunk);
 bool CheckOnGround(Player* player, Chunk* chunk);
 void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime);
+void DrawCubeTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color); // Draw cube textured
+
 
 
 
@@ -69,6 +72,17 @@ int main(void) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, "raymine v0.0.1");
     SetTargetFPS(60);
+
+    Texture2D grassTex = LoadTexture("assets/grass_full.png");
+    Texture2D dirtTex = LoadTexture("assets/dirt.png");
+    Texture2D stoneTex = LoadTexture("assets/cobblestone.png");
+
+    SetTextureFilter(grassTex, TEXTURE_FILTER_ANISOTROPIC_16X);
+    SetTextureWrap(grassTex, TEXTURE_WRAP_CLAMP);
+    SetTextureFilter(dirtTex, TEXTURE_FILTER_ANISOTROPIC_16X);
+    SetTextureWrap(dirtTex, TEXTURE_WRAP_CLAMP);
+    SetTextureFilter(stoneTex, TEXTURE_FILTER_ANISOTROPIC_16X);
+    SetTextureWrap(stoneTex, TEXTURE_WRAP_CLAMP);
 
     // create a single chunk for now
     Chunk chunk;
@@ -126,14 +140,16 @@ int main(void) {
                             if(IsBlockVisible(&chunk, x, y, z) == false) continue;
                             //may consider placing this in it's own function
                             if(chunk.blocks[x][y][z] == BLOCK_GRASS) {
-                                DrawCubeV((Vector3) { x+0.5f, y + 0.5f, z+0.5f }, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKGREEN);
-                                DrawCubeWiresV((Vector3) { x+0.5f, y + 0.5f, z+0.5f }, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
+                                DrawCubeTexture(grassTex, (Vector3) { x+0.5f, y + 0.5f, z+0.5f }, 1.0f, 1.0f, 1.0f, WHITE);
+                                //DrawCubeWiresV((Vector3) { x+0.5f, y + 0.5f, z+0.5f }, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
                             }else if(chunk.blocks[x][y][z] == BLOCK_DIRT) {
-                                DrawCubeV((Vector3) { x+0.5f, y + 0.5f, z+0.5f }, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKBROWN);
-                                DrawCubeWiresV((Vector3) { x+0.5f, y + 0.5f, z+0.5f }, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
+                                // DrawCubeV((Vector3) { x+0.5f, y + 0.5f, z+0.5f }, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKBROWN);
+                                // DrawCubeWiresV((Vector3) { x+0.5f, y + 0.5f, z+0.5f }, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
+                                DrawCubeTexture(dirtTex, (Vector3) { x+0.5f, y + 0.5f, z+0.5f }, 1.0f, 1.0f, 1.0f, WHITE);
                             }else {
-                                DrawCubeV((Vector3) { x+0.5f, y + 0.5f, z+0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKGRAY);
-                                DrawCubeWiresV((Vector3) { x+0.5f, y + 0.5f, z+0.5f }, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
+                                // DrawCubeV((Vector3) { x+0.5f, y + 0.5f, z+0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, DARKGRAY);
+                                // DrawCubeWiresV((Vector3) { x+0.5f, y + 0.5f, z+0.5f }, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
+                                DrawCubeTexture(stoneTex, (Vector3) { x+0.5f, y + 0.5f, z+0.5f }, 1.0f, 1.0f, 1.0f, WHITE);
                             }
                         }
                     }
@@ -383,4 +399,66 @@ void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, C
     camera->target = Vector3Add(camera->position, camCtrl->direction);
     camera->up = (Vector3) { 0.0f, 1.0f, 0.0f };
 
+}
+
+
+void DrawCubeTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color)
+{
+    float x = position.x;
+    float y = position.y;
+    float z = position.z;
+
+    // Set desired texture to be enabled while drawing following vertex data
+    rlSetTexture(texture.id);
+
+    // Vertex data transformation can be defined with the commented lines,
+    // but in this example we calculate the transformed vertex data directly when calling rlVertex3f()
+    //rlPushMatrix();
+        // NOTE: Transformation is applied in inverse order (scale -> rotate -> translate)
+        //rlTranslatef(2.0f, 0.0f, 0.0f);
+        //rlRotatef(45, 0, 1, 0);
+        //rlScalef(2.0f, 2.0f, 2.0f);
+
+        rlBegin(RL_QUADS);
+            rlColor4ub(color.r, color.g, color.b, color.a);
+            // Front Face
+            rlNormal3f(0.0f, 0.0f, 1.0f);       // Normal Pointing Towards Viewer
+            rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z + length/2);  // Bottom Left Of The Texture and Quad
+            rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z + length/2);  // Bottom Right Of The Texture and Quad
+            rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z + length/2);  // Top Right Of The Texture and Quad
+            rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z + length/2);  // Top Left Of The Texture and Quad
+            // Back Face
+            rlNormal3f(0.0f, 0.0f, - 1.0f);     // Normal Pointing Away From Viewer
+            rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z - length/2);  // Bottom Right Of The Texture and Quad
+            rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z - length/2);  // Top Right Of The Texture and Quad
+            rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z - length/2);  // Top Left Of The Texture and Quad
+            rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z - length/2);  // Bottom Left Of The Texture and Quad
+            // Top Face
+            rlNormal3f(0.0f, 1.0f, 0.0f);       // Normal Pointing Up
+            rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z - length/2);  // Top Left Of The Texture and Quad
+            rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x - width/2, y + height/2, z + length/2);  // Bottom Left Of The Texture and Quad
+            rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x + width/2, y + height/2, z + length/2);  // Bottom Right Of The Texture and Quad
+            rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z - length/2);  // Top Right Of The Texture and Quad
+            // Bottom Face
+            rlNormal3f(0.0f, - 1.0f, 0.0f);     // Normal Pointing Down
+            rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x - width/2, y - height/2, z - length/2);  // Top Right Of The Texture and Quad
+            rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x + width/2, y - height/2, z - length/2);  // Top Left Of The Texture and Quad
+            rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z + length/2);  // Bottom Left Of The Texture and Quad
+            rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z + length/2);  // Bottom Right Of The Texture and Quad
+            // Right face
+            rlNormal3f(1.0f, 0.0f, 0.0f);       // Normal Pointing Right
+            rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z - length/2);  // Bottom Right Of The Texture and Quad
+            rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z - length/2);  // Top Right Of The Texture and Quad
+            rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z + length/2);  // Top Left Of The Texture and Quad
+            rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z + length/2);  // Bottom Left Of The Texture and Quad
+            // Left Face
+            rlNormal3f( - 1.0f, 0.0f, 0.0f);    // Normal Pointing Left
+            rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z - length/2);  // Bottom Left Of The Texture and Quad
+            rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z + length/2);  // Bottom Right Of The Texture and Quad
+            rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z + length/2);  // Top Right Of The Texture and Quad
+            rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z - length/2);  // Top Left Of The Texture and Quad
+        rlEnd();
+    //rlPopMatrix();
+
+    rlSetTexture(0);
 }
