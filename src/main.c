@@ -57,10 +57,10 @@ typedef struct {
 // PROTOTYPES
 void InitializeChunk(Chunk* chunk);
 bool IsBlockVisible(Chunk*, int x, int y, int z);
-void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime);
-void ProcessInput(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime);
+void SetLookDirection(CameraController* camCtrl);
 void CastRay(Camera3D camera, Player* player, Chunk* chunk);
 bool CheckOnGround(Player* player, Chunk* chunk);
+void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime);
 
 
 
@@ -105,13 +105,12 @@ int main(void) {
 
 
         float deltaTime = GetFrameTime();
-        //UpdateCamera(&camera, CAMERA_FIRST_PERSON);
 
-        UpdatePlayer(&player, &camera, &camCtrl, &chunk, deltaTime);
-
-        ProcessInput(&player, &camera, &camCtrl, &chunk, deltaTime);
+        SetLookDirection(&camCtrl);
 
         CastRay(camera, &player, &chunk);
+
+        UpdatePlayer(&player, &camera, &camCtrl, &chunk, deltaTime);
 
 
         BeginDrawing();
@@ -214,39 +213,8 @@ bool IsBlockVisible(Chunk* chunk, int x, int y, int z) {
     return true;
 }
 
-void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime) {
-    // figuring out wall collision
-    // if (chunk->blocks[(int)player->nextPosition.x][(int)player->nextPosition.y][(int)player->nextPosition.z] == BLOCK_AIR) {
-    //     player->position = player->nextPosition;
-    // }    
-    player->position.x = player->nextPosition.x;
-    player->position.z = player->nextPosition.z;
 
-
-
-    //if player is in the air, fall down. (may update this to add free mode)
-    if(CheckOnGround(player, chunk)) {
-        player->velocity.y = 0; 
-        player->isOnGround = true;
-    } else {
-        player->velocity.y += GRAVITY * deltaTime;
-        player->position.y += player->velocity.y * deltaTime;
-        player->isOnGround = false;
-    }
-
-
-    
-    camera->position = (Vector3) { 
-        player->position.x, 
-        player->position.y + player->height * 0.9f,
-        player->position.z
-    };
-    camera->target = Vector3Add(camera->position, camCtrl->direction);
-    camera->up = (Vector3) { 0.0f, 1.0f, 0.0f };
-
-}
-
-void ProcessInput(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime){
+void SetLookDirection(CameraController* camCtrl){
     //I'll be honest, the next little bit that has to do w/ camCtrl chatGPT helped me with :)
     // setting up mouse look
     Vector2 mouseDelta = GetMouseDelta();
@@ -265,46 +233,6 @@ void ProcessInput(Player* player, Camera3D* camera, CameraController* camCtrl, C
         sinf(camCtrl->pitch),
         cosf(camCtrl->pitch) * cosf(camCtrl->yaw)
     };
-
-    // basic movement
-    Vector3 forward = { camCtrl->direction.x, 0.0f, camCtrl->direction.z };
-    Vector3 right = { -forward.z, 0.0f, forward.x };
-    Vector3 move = Vector3Zero();
-    float speed = 5.0f;
-    // moving x and z
-    if (IsKeyDown(KEY_W)) move = Vector3Add(move, forward);
-    if (IsKeyDown(KEY_S)) move = Vector3Subtract(move, forward);
-    if (IsKeyDown(KEY_A)) move = Vector3Subtract(move, right);
-    if (IsKeyDown(KEY_D)) move = Vector3Add(move, right);
-
-    if (Vector3Length(move) > 0.0f)
-        move = Vector3Normalize(move);
-
-    move = Vector3Scale(move, speed * deltaTime);
-    //x and z collision
-    player->nextPosition = Vector3Add(player->position, move);
-
-    //jumping
-    if(IsKeyPressed(KEY_SPACE) && player->isOnGround) {
-        player->velocity.y = 5.0f;
-        player->isOnGround = false;
-    }
-
-    if(player->hasTargetBlock) {
-        if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            int x = (int)player->targetBlock.x;
-            int y = (int)player->targetBlock.y;
-            int z = (int)player->targetBlock.z;
-
-            if(x >= 0 && x < CHUNK_WIDTH && 
-            y >= 0 && y < CHUNK_HEIGHT && 
-            z >= 0 && z < CHUNK_DEPTH) {
-                chunk->blocks[x][y][z] = BLOCK_AIR;
-            }
-
-
-        }
-    }
 }
 
 void CastRay(Camera3D camera, Player* player, Chunk* chunk) {
@@ -339,14 +267,32 @@ void CastRay(Camera3D camera, Player* player, Chunk* chunk) {
     }
 }
 
+float GetGroundY(Vector3 pos, Chunk* chunk) {
+    int blockX = (int)floorf(pos.x);
+    int blockZ = (int)floorf(pos.z);
+
+    //will need to change this when adding more chunks
+    if(blockX < 0) blockX = 0;
+    if(blockX >= CHUNK_WIDTH) blockX = CHUNK_WIDTH - 1;
+    if(blockZ < 0) blockZ = 0;
+    if(blockZ >= CHUNK_DEPTH) blockZ = CHUNK_DEPTH - 1;
+
+    for(int y = CHUNK_HEIGHT - 1; y >= 0; y--) {
+        if(chunk->blocks[blockX][y][blockZ] != BLOCK_AIR) {
+            return (float) y + 1.0f;
+        }
+    }
+
+}
+
 bool CheckOnGround(Player* player, Chunk* chunk) {
     // player's pos is in center of player, so get feed by subtracting half of player
     // we subtract 0.01 just to push us into the next block's pos
-    float footY = player->position.y - (player->height * 0.5f) - 0.01f;
+    float footY = player->nextPosition.y - (player->height * 0.5f) - 0.01f;
 
-    int x = (int)floor(player->position.x);
+    int x = (int)floor(player->nextPosition.x);
     int y = (int)floor(footY);
-    int z = (int)floor(player->position.z);
+    int z = (int)floor(player->nextPosition.z);
     // may need to alter this when we add more chunks
     if(x < 0 || x >= CHUNK_WIDTH ||
        y < 0 || y >= CHUNK_HEIGHT ||
@@ -354,5 +300,88 @@ bool CheckOnGround(Player* player, Chunk* chunk) {
         
     // if the block below us isn't air, we are on ground, return true, else false
     return (chunk->blocks[x][y][z] != BLOCK_AIR);
+
+}
+
+void UpdatePlayer(Player* player, Camera3D* camera, CameraController* camCtrl, Chunk* chunk, float deltaTime) {
+    if(player->hasTargetBlock) {
+        if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            int x = (int)player->targetBlock.x;
+            int y = (int)player->targetBlock.y;
+            int z = (int)player->targetBlock.z;
+
+            if(x >= 0 && x < CHUNK_WIDTH && 
+            y >= 0 && y < CHUNK_HEIGHT && 
+            z >= 0 && z < CHUNK_DEPTH) {
+                chunk->blocks[x][y][z] = BLOCK_AIR;
+            }
+
+
+        }
+    }
+
+
+    // basic movement
+    Vector3 forward = { camCtrl->direction.x, 0.0f, camCtrl->direction.z };
+    Vector3 right = { -forward.z, 0.0f, forward.x };
+    Vector3 move = Vector3Zero();
+    float speed = 5.0f;
+    // moving x and z
+    if (IsKeyDown(KEY_W)) move = Vector3Add(move, forward);
+    if (IsKeyDown(KEY_S)) move = Vector3Subtract(move, forward);
+    if (IsKeyDown(KEY_A)) move = Vector3Subtract(move, right);
+    if (IsKeyDown(KEY_D)) move = Vector3Add(move, right);
+
+    if (Vector3Length(move) > 0.0f)
+        move = Vector3Scale(Vector3Normalize(move), speed * deltaTime);
+    
+    //jumping
+    if(player->isOnGround && IsKeyPressed(KEY_SPACE)) {
+        player->velocity.y = 5.0f;
+        player->isOnGround = false;
+    }
+    player->velocity.y += GRAVITY * deltaTime;
+
+    player->nextPosition = player->position;
+    player->nextPosition.x += move.x;
+    player->nextPosition.z += move.z;
+    player->nextPosition.y += player->velocity.y * deltaTime;
+    
+
+
+    //if player is in the air, fall down. (may update this to add free mode)
+    if(CheckOnGround(player, chunk)) {
+        player->nextPosition = 
+        player->velocity.y = 0; 
+        player->nextPosition.y += player->velocity.y * deltaTime;
+        player->isOnGround = true;
+    } else {
+        player->velocity.y += GRAVITY * deltaTime;
+        player->nextPosition.y += player->velocity.y * deltaTime;
+        player->isOnGround = false;
+    }
+
+
+
+
+
+
+    // figuring out wall collision
+    // if (chunk->blocks[(int)player->nextPosition.x][(int)player->nextPosition.y][(int)player->nextPosition.z] == BLOCK_AIR) {
+    //     player->position = player->nextPosition;
+    // }    
+    // player->position.x = player->nextPosition.x;
+    // player->position.z = player->nextPosition.z;
+    player->position = player->nextPosition;
+
+
+    
+    camera->position = (Vector3) { 
+        player->position.x, 
+        player->position.y + player->height * 0.9f,
+        player->position.z
+    };
+    camera->target = Vector3Add(camera->position, camCtrl->direction);
+    camera->up = (Vector3) { 0.0f, 1.0f, 0.0f };
 
 }
