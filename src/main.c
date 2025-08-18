@@ -17,9 +17,9 @@
 #define screenHeight 750
 //#define EYE_LEVEL PLAYER_HEIGHT * 0.9;
 // starting with smaller chunk sizes, can change later
-const int CHUNK_WIDTH = 16;
-const int CHUNK_HEIGHT = 64;
-const int CHUNK_DEPTH = 16;
+#define CHUNK_WIDTH 16
+#define CHUNK_HEIGHT 64
+#define CHUNK_DEPTH 16
 const float PLAYER_HEIGHT = 2.0f;
 const float PLAYER_RADIUS = 0.2f;
 const float GRAVITY = -9.8f;
