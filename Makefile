@@ -1,18 +1,28 @@
-# Compiler and Directories
-COMPILER = clang
+OS_NAME := $(shell uname -s)
+
+# Common
 CFILES = src/*.c
 SOURCE_LIBS = -Ilib/
+OUTPUT = bin/build
 
-# macOS-specific options
-OSX_OPT = -Llib/ -framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL lib/libraylib.a
-OUTPUT = bin/build_osx
+# macOS-specific
+ifeq ($(OS_NAME),Darwin)
+	COMPILER = clang
+	OS_OPT = -Llib/ -framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL lib/libraylib.a
+endif
+
+# Linux-specific
+ifeq ($(OS_NAME),Linux)
+	COMPILER = gcc
+	OS_OPT = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
+endif
 
 # Build Target
-build_osx: 
-	$(COMPILER) $(CFILES) $(SOURCE_LIBS) $(OSX_OPT) -o $(OUTPUT)
+build:
+	$(COMPILER) $(CFILES) $(SOURCE_LIBS) -o $(OUTPUT) $(OS_OPT)
 
 # Run Target
-run: build_osx
+run: build
 	./$(OUTPUT)
 
 # Clean Target
