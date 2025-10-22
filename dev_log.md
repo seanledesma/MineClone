@@ -1,3 +1,15 @@
+*Wednesday, October 22nd 2025*
+So I'm thinking of how I'm going to structure the data of my game. I will use a 3D array for blocks in a chunk like I 
+originally did, but I will take a lot more care in how I organize those chunks. My plan is to have each chunk be of type
+struct Chunk, the struct will have variables for 3D chunk coords and the key used to hash and find in the table.
+ex:
+struct ChunkEntry {
+    int cx, cy, cz;
+    int key;
+} ChunkEntry;
+I will start out by making the first chunk, at floor(player.pos / CHUNK_SIZE).
+I'll need two
+
 *Saturday, October 18th 2025*
 So I've decided to start over, lol.
 
