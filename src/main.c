@@ -1,6 +1,7 @@
 // I decided to start over from scratch
 #include "raylib.h" 
 #include "rcamera.h"
+#include "raymath.h"
 #include "myhash.h"
 #include <stdlib.h>
 
@@ -26,7 +27,7 @@ typedef struct Chunk{
 typedef struct ChunkEntry{
     Chunk chunk;
     int cx, cy, cz;
-    int key;
+    uint64_t key;
     struct ChunkEntry* next_chunk_entry;
 }ChunkEntry;
 
@@ -35,10 +36,12 @@ typedef struct {
 }ChunkTable;
 
 
-int hash_index(uint64_t key);
+size_t hash_index(uint64_t key);
 void add_chunk(ChunkTable *table, int cx, int cy, int cz, Chunk chunk);
 Chunk *get_chunk(ChunkTable *table, int cx, int cy, int cz);
 void remove_chunk(ChunkTable *table, int cx, int cy, int cz);
+void create_chunk(ChunkTable *table, int cx, int cy, int cz);
+Chunk *get_current_chunk(ChunkTable *table, int cx, int cy, int cz);
 
 int main(void) {
     const int screenWidth = 1280;
@@ -56,20 +59,22 @@ int main(void) {
 
     int cameraMode = CAMERA_FIRST_PERSON;
 
-    ChunkTable chunkTable;
+    ChunkTable chunkTable = { 0 };
 
     //make base chunk
-    Chunk homeChunk;
-    for (int x = 0; x < CHUNK_SIZE; x++) {
-        for (int y = 0; y < CHUNK_SIZE; y++) {
-            for (int z = 0; z < CHUNK_SIZE; z++) {
-                homeChunk.blocks[x][y][z].blockType = BLOCK_DIRT;
-                homeChunk.blocks[x][y][z].pos = (Vector3) { (x * -1) - 1, (y * -1) - 1, (z * -1) - 1 };
-            }
-        }
-    }
+    // Chunk homeChunk;
+    // for (int x = 0; x < CHUNK_SIZE; x++) {
+    //     for (int y = 0; y < CHUNK_SIZE; y++) {
+    //         for (int z = 0; z < CHUNK_SIZE; z++) {
+    //             homeChunk.blocks[x][y][z].blockType = BLOCK_DIRT;
+    //             homeChunk.blocks[x][y][z].pos = (Vector3) { (x * -1) - 1, (y * -1) - 1, (z * -1) - 1 };
+    //         }
+    //     }
+    // }
 
-    add_chunk(&chunkTable, 0, 0, 0, homeChunk);
+    // add_chunk(&chunkTable, 0, 0, 0, homeChunk);
+
+    //get_current_chunk(chunkTable, )
     
 
     DisableCursor();
@@ -101,7 +106,8 @@ int main(void) {
             GetMouseWheelMove()*2.0f);                              // Move to target (zoom)
 */
 
-        // next I want to make a chunk
+        // next I want to update the current chunk as the player moves
+        Chunk *current_chunk = get_current_chunk(&chunkTable, floor(camera.position.x / CHUNK_SIZE), floor((camera.position.y - 2) / CHUNK_SIZE), floor(camera.position.z / CHUNK_SIZE));
 
 
         BeginDrawing();
@@ -114,14 +120,14 @@ int main(void) {
                 for (int x = 0; x < CHUNK_SIZE; x++) {
                     for (int y = 0; y < CHUNK_SIZE; y++) {
                         for (int z = 0; z < CHUNK_SIZE; z++) {
-                            DrawCubeV(homeChunk.blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
-                            DrawCubeWiresV(homeChunk.blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                            DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                            DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
                         }
                     }
                 }
 
             EndMode3D();
-            //DrawText("congrats! our first window!", 190, 200, 20, LIGHTGRAY);
+            //DrawText(TextFormat("current chunk coords: x:%d, y:%d, z:%d ", current_chunk), 190, 200, 20, LIGHTGRAY);
             DrawFPS(10, 10);
         EndDrawing();
     }
@@ -132,7 +138,7 @@ int main(void) {
 }
 
 //hash_index takes the resut of the hash function, and makes it a number that can fit in my hash table.
-int hash_index(uint64_t key) {
+size_t hash_index(uint64_t key) {
     return key % HASH_TABLE_SIZE;
 }
 
@@ -170,6 +176,7 @@ Chunk *get_chunk(ChunkTable *table, int cx, int cy, int cz) {
             // keep an eye on this, should be fine
             return &current_entry->chunk;
         }
+        current_entry = current_entry->next_chunk_entry;
     }
     return NULL;
 }
@@ -181,26 +188,51 @@ void remove_chunk(ChunkTable *table, int cx, int cy, int cz) {
     int index = hash_index(key);
 
     ChunkEntry *current_entry = table->buckets[index];
-    //handle head node first
+    //key not present in the linked list?
+    if (current_entry == NULL) return;
+
+    //handle head node 
     if(current_entry->key == key) {
         table->buckets[index] = current_entry->next_chunk_entry;
+        free(current_entry);
         return;
     }
     //not head node? let's keep track of old nodes to link to next node should we find the matching key
-    ChunkEntry *temp;
+    ChunkEntry *prev = current_entry;
+    current_entry = current_entry->next_chunk_entry;
     while(current_entry != NULL) {
-        temp = current_entry;
-        current_entry = current_entry->next_chunk_entry;
         if(current_entry->key == key) {
-            temp->next_chunk_entry = current_entry->next_chunk_entry;
+            prev->next_chunk_entry = current_entry->next_chunk_entry;
             free(current_entry);
             return;
         }
+        prev = current_entry;
+        current_entry = current_entry->next_chunk_entry;
     }
-    //key not present in the linked list?
-    if (current_entry == NULL) {
-        return;
-    }
+}
 
-    return;
+void create_chunk(ChunkTable *table, int cx, int cy, int cz) {
+    Chunk new_chunk;
+    for (int x = 0; x < CHUNK_SIZE; x++) {
+        for (int y = 0; y < CHUNK_SIZE; y++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
+                new_chunk.blocks[x][y][z].pos = (Vector3) { 
+                    x + (cx * CHUNK_SIZE), 
+                    (0 - y) + (cy * CHUNK_SIZE), 
+                    z + (cz * CHUNK_SIZE)};
+            }
+        }
+    }
+    add_chunk(table, cx, cy, cz, new_chunk);
+}
+
+Chunk *get_current_chunk(ChunkTable *table, int cx, int cy, int cz) {
+    
+    Chunk *chunk = get_chunk(table, cx, cy, cz);
+    if (chunk == NULL) {
+        create_chunk(table, cx, cy, cz);
+        chunk = get_chunk(table, cx, cy, cz);
+    }
+    return chunk;
 }
