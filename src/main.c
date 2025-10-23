@@ -1,8 +1,11 @@
 // I decided to start over from scratch
 #include "raylib.h" 
 #include "rcamera.h"
+#include "myhash.h"
+#include <stdlib.h>
 
 #define CHUNK_SIZE 16
+#define HASH_TABLE_SIZE 1024
 
 enum BlockType {
     BLOCK_AIR,
@@ -11,17 +14,31 @@ enum BlockType {
     BLOCK_STONE,
 };
 
+typedef struct Block {
+    Vector3 pos;
+    int blockType;
+} Block;
+
 typedef struct Chunk{
-    int blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+    Block blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
 }Chunk;
 
 typedef struct ChunkEntry{
+    Chunk chunk;
     int cx, cy, cz;
     int key;
+    struct ChunkEntry* next_chunk_entry;
 }ChunkEntry;
 
+typedef struct {
+    ChunkEntry *buckets[HASH_TABLE_SIZE];
+}ChunkTable;
 
 
+int hash_index(uint64_t key);
+void add_chunk(ChunkTable *table, int cx, int cy, int cz, Chunk chunk);
+Chunk *get_chunk(ChunkTable *table, int cx, int cy, int cz);
+void remove_chunk(ChunkTable *table, int cx, int cy, int cz);
 
 int main(void) {
     const int screenWidth = 1280;
@@ -39,15 +56,21 @@ int main(void) {
 
     int cameraMode = CAMERA_FIRST_PERSON;
 
+    ChunkTable chunkTable;
+
     //make base chunk
     Chunk homeChunk;
     for (int x = 0; x < CHUNK_SIZE; x++) {
         for (int y = 0; y < CHUNK_SIZE; y++) {
             for (int z = 0; z < CHUNK_SIZE; z++) {
-                homeChunk.blocks[x][y][z] = BLOCK_DIRT;
+                homeChunk.blocks[x][y][z].blockType = BLOCK_DIRT;
+                homeChunk.blocks[x][y][z].pos = (Vector3) { (x * -1) - 1, (y * -1) - 1, (z * -1) - 1 };
             }
         }
     }
+
+    add_chunk(&chunkTable, 0, 0, 0, homeChunk);
+    
 
     DisableCursor();
     SetTargetFPS(120);
@@ -91,8 +114,8 @@ int main(void) {
                 for (int x = 0; x < CHUNK_SIZE; x++) {
                     for (int y = 0; y < CHUNK_SIZE; y++) {
                         for (int z = 0; z < CHUNK_SIZE; z++) {
-                            DrawCubeV((Vector3) { x, y, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
-                            DrawCubeWiresV((Vector3) { x, y, z }, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                            DrawCubeV(homeChunk.blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                            DrawCubeWiresV(homeChunk.blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
                         }
                     }
                 }
@@ -106,4 +129,78 @@ int main(void) {
     CloseWindow();
 
     return 0;       
+}
+
+//hash_index takes the resut of the hash function, and makes it a number that can fit in my hash table.
+int hash_index(uint64_t key) {
+    return key % HASH_TABLE_SIZE;
+}
+
+//saves chunk in chunk table using hash index (which we get after getting hash)
+//will save new chunk entry as new node in linked list at appropriate bucket index
+void add_chunk(ChunkTable *table, int cx, int cy, int cz, Chunk chunk) {
+
+    /* create new node (chunk entry) */
+    ChunkEntry* new_entry = (ChunkEntry*)malloc(sizeof(ChunkEntry));
+    
+    new_entry->key = chunk_hash(cx, cy, cz);
+    new_entry->cx = cx;
+    new_entry->cy = cy;
+    new_entry->cz = cz;
+    new_entry->chunk = chunk;
+    new_entry->next_chunk_entry = NULL;
+
+    /* get index for hashtable, place new entry at head of index's linked list */
+    int index = hash_index(new_entry->key);
+    
+    new_entry->next_chunk_entry = table->buckets[index];
+    table->buckets[index] = new_entry;
+
+}
+
+Chunk *get_chunk(ChunkTable *table, int cx, int cy, int cz) {
+
+    /* since I know the cx,cy,cz coords I can recreate the hash and find the correct index */
+    uint64_t key = chunk_hash(cx, cy, cz);
+    int index = hash_index(key);
+    /* I need to cycle through the chunk entries at index til I find the right key */
+    ChunkEntry *current_entry = table->buckets[index];
+    while(current_entry != NULL) {
+        if(current_entry->key == key) {
+            // keep an eye on this, should be fine
+            return &current_entry->chunk;
+        }
+    }
+    return NULL;
+}
+
+void remove_chunk(ChunkTable *table, int cx, int cy, int cz) {
+    /* the goal here is to find the key using the coords, get the index, find the right chunk 
+        entry, and connect the nodes on either side of it to remove it */
+    uint64_t key = chunk_hash(cx, cy, cz);
+    int index = hash_index(key);
+
+    ChunkEntry *current_entry = table->buckets[index];
+    //handle head node first
+    if(current_entry->key == key) {
+        table->buckets[index] = current_entry->next_chunk_entry;
+        return;
+    }
+    //not head node? let's keep track of old nodes to link to next node should we find the matching key
+    ChunkEntry *temp;
+    while(current_entry != NULL) {
+        temp = current_entry;
+        current_entry = current_entry->next_chunk_entry;
+        if(current_entry->key == key) {
+            temp->next_chunk_entry = current_entry->next_chunk_entry;
+            free(current_entry);
+            return;
+        }
+    }
+    //key not present in the linked list?
+    if (current_entry == NULL) {
+        return;
+    }
+
+    return;
 }
