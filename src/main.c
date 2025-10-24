@@ -7,6 +7,7 @@
 
 #define CHUNK_SIZE 16
 #define HASH_TABLE_SIZE 1024
+#define CHUNK_RENDER_MAX 2
 
 enum BlockType {
     BLOCK_AIR,
@@ -21,6 +22,7 @@ typedef struct Block {
 } Block;
 
 typedef struct Chunk{
+    Vector3 pos;
     Block blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
 }Chunk;
 
@@ -52,7 +54,7 @@ int main(void) {
     // Define the camera to look into our 3d world (position, target, up vector)
     Camera camera = { 0 };
     camera.position = (Vector3){ 0.0f, 2.0f, 5.0f };    // Camera position
-    camera.target = (Vector3){ 0.0f, 2.0f, 0.0f };      // Camera looking at point
+    camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };      // Camera looking at point
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
     camera.fovy = 60.0f;                                // Camera field-of-view Y
     camera.projection = CAMERA_PERSPECTIVE;             // Camera projection type
@@ -75,6 +77,12 @@ int main(void) {
     // add_chunk(&chunkTable, 0, 0, 0, homeChunk);
 
     //get_current_chunk(chunkTable, )
+
+    // next I want to update the current chunk as the player moves
+    int cx = floor(camera.position.x / CHUNK_SIZE);
+    int cy = floor((camera.position.y - 2) / CHUNK_SIZE);
+    int cz = floor(camera.position.z / CHUNK_SIZE);
+    Chunk *current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
     
 
     DisableCursor();
@@ -106,9 +114,53 @@ int main(void) {
             GetMouseWheelMove()*2.0f);                              // Move to target (zoom)
 */
 
-        // next I want to update the current chunk as the player moves
-        Chunk *current_chunk = get_current_chunk(&chunkTable, floor(camera.position.x / CHUNK_SIZE), floor((camera.position.y - 2) / CHUNK_SIZE), floor(camera.position.z / CHUNK_SIZE));
+        // // next I want to update the current chunk as the player moves
+        // int cx = floor(camera.position.x / CHUNK_SIZE);
+        // int cy = floor((camera.position.y - 2) / CHUNK_SIZE);
+        // int cz = floor(camera.position.z / CHUNK_SIZE);
+        // Chunk *current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
+        //Chunk *home_chunk = current_chunk;
+        // I'm going to attempt to generate chunks surrounding the player
+        //let's make an array so we don't have to loop this many times to render
+        //((CHUNK_RENDER_MAX * 2) + 1) ^ 3 example: 2 blocks deep, 2 + 2 + og block (1) = 5, 5^3 = 125
+        //int nearby_chunk_count = ((CHUNK_RENDER_MAX * 2) + 1) ^ 3;
+        //int nearby_chunk_count = 100000;
+        // Vector3 visible_chunk_positions[nearby_chunk_count];
+        // int chunk_tracker = 0;
+        // for (int x = -CHUNK_RENDER_MAX; x <= CHUNK_RENDER_MAX; x++) {
+        //     for (int y = -CHUNK_RENDER_MAX; y <= CHUNK_RENDER_MAX; y++) {
+        //         for (int z = -CHUNK_RENDER_MAX; z <= CHUNK_RENDER_MAX; z++) {
+        //             //create chunks for each axis, starting at -render max, then to +render max
+        //             create_chunk(&chunkTable, cx + (x * CHUNK_SIZE * CHUNK_RENDER_MAX), cy + (y * CHUNK_SIZE * CHUNK_RENDER_MAX), cz + (z * CHUNK_SIZE * CHUNK_RENDER_MAX));
+        //             //create_chunk(&chunkTable, cx + x, cy + y, cz + z);
+        //             visible_chunk_positions[chunk_tracker] = (Vector3) { cx + (x * CHUNK_SIZE * CHUNK_RENDER_MAX), cy + (y * CHUNK_SIZE * CHUNK_RENDER_MAX), cz + (z * CHUNK_SIZE * CHUNK_RENDER_MAX) };
+        //             chunk_tracker++;
+        //         }
+        //     }
+        // }
+        if (floor(camera.position.x / (CHUNK_SIZE / 2)) >= 0) {
+            cx = floor(camera.position.x / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
+        } else if (floor(camera.position.x / (CHUNK_SIZE / 2)) < 0) {
+            cx = ceil(camera.position.x / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
+        }
 
+        if (floor(camera.position.y / (CHUNK_SIZE / 2)) >= 0) {
+            cy = floor((camera.position.y - 2) / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
+        } else if (floor(camera.position.y / (CHUNK_SIZE / 2)) < 0) {
+            cy = ceil(camera.position.y / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
+        }
+
+        if (floor(camera.position.z / (CHUNK_SIZE / 2)) >= 0) {
+            cz = floor(camera.position.z / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
+        } else if (floor(camera.position.z / (CHUNK_SIZE / 2)) < 0) {
+            cz = ceil(camera.position.z / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
+        }
+        current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
+
+        // cx = floor((camera.position.x / CHUNK_SIZE)) * CHUNK_SIZE;
+        // cy = floor((camera.position.y - 2) / CHUNK_SIZE);
+        // cz = floor(camera.position.z / CHUNK_SIZE);
+        // current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
 
         BeginDrawing();
             ClearBackground(BLACK);
@@ -116,18 +168,94 @@ int main(void) {
 
                 //DrawCubeV((Vector3) { 0.0f, 0.0f, 0.0f }, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
                 //DrawCubeWiresV((Vector3) { 0.0f, 0.0f, 0.0f }, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                //for (int i = 0; i < nearby_chunk_count; i++) {
+                    // for (int x = 0; x < CHUNK_SIZE; x++) {
+                    //     for (int y = 0; y < CHUNK_SIZE; y++) {
+                    //         for (int z = 0; z < CHUNK_SIZE; z++) {
+                    //             //DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                    //             DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                    //         }
+                    //     }
+                    // }
 
+                    // for (int a = -CHUNK_RENDER_MAX; a < CHUNK_RENDER_MAX; a++) {
+                    //     for (int b = -CHUNK_RENDER_MAX; b < CHUNK_RENDER_MAX; b++) {
+                    //         for (int c = -CHUNK_RENDER_MAX; c < CHUNK_RENDER_MAX; c++) {
+                    //             for (int x = 0; x < CHUNK_SIZE; x++) {
+                    //                 for (int y = 0; y < CHUNK_SIZE; y++) {
+                    //                     for (int z = 0; z < CHUNK_SIZE; z++) {
+                    //                         //DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                    //                         //DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                    //                     }
+                    //                 }
+                    //             }
+                    //             DrawCubeWiresV(current_chunk->pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, GRAY);
+                    //             //create chunks for each axis, starting at -render max, then to +render max
+                    //             //current_chunk = get_chunk(&chunkTable, current_chunk->pos.x, cy + (b * CHUNK_SIZE * CHUNK_RENDER_MAX), cz + (c * CHUNK_SIZE * CHUNK_RENDER_MAX));
+                    //             //current_chunk = get_chunk(&chunkTable, current_chunk->pos.x, current_chunk->pos.y, current_chunk->pos.z);
+
+                    //         }
+                    //     }
+                    // }
+
+                    // for (int x = 0; x < CHUNK_SIZE; x++) {
+                    //     for (int y = 0; y < CHUNK_SIZE; y++) {
+                    //         for (int z = 0; z < CHUNK_SIZE; z++) {
+                    //             //DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                    //             //DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                    //         }
+                    //     }
+                    // }
+                    //DrawCubeWiresV(current_chunk->pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, GRAY);
+                    //create chunks for each axis, starting at -render max, then to +render max
+                    //current_chunk = get_chunk(&chunkTable, visible_chunk_positions[i].x, visible_chunk_positions[i].y, visible_chunk_positions[i].z);
+                    //current_chunk = get_chunk(&chunkTable, current_chunk->pos.x, cy + (b * CHUNK_SIZE * CHUNK_RENDER_MAX), cz + (c * CHUNK_SIZE * CHUNK_RENDER_MAX));
+                    
+
+                    // DrawCubeWiresV(current_chunk->pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, PINK);
+                    // for (int x = 0; x < CHUNK_SIZE; x++) {
+                    //     for (int y = 0; y < CHUNK_SIZE; y++) {
+                    //         for (int z = 0; z < CHUNK_SIZE; z++) {
+                    //             //DrawCubeV(home_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                    //             DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                    //         }
+                    //     }
+                    // }
+                    // //current_chunk = get_chunk(&chunkTable, visible_chunk_positions[i].x, visible_chunk_positions[i].y, visible_chunk_positions[i].z);
+                    // current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
+                //}
+
+                DrawCubeWiresV(current_chunk->pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, PINK);
                 for (int x = 0; x < CHUNK_SIZE; x++) {
                     for (int y = 0; y < CHUNK_SIZE; y++) {
                         for (int z = 0; z < CHUNK_SIZE; z++) {
-                            DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                            //DrawCubeV(home_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
                             DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
                         }
                     }
                 }
+                //current_chunk = get_chunk(&chunkTable, visible_chunk_positions[i].x, visible_chunk_positions[i].y, visible_chunk_positions[i].z);
+                //current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
+
+                // DrawCubeWiresV(current_chunk->pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, PINK);
+                // for (int x = 0; x < CHUNK_SIZE; x++) {
+                //     for (int y = 0; y < CHUNK_SIZE; y++) {
+                //         for (int z = 0; z < CHUNK_SIZE; z++) {
+                //             //DrawCubeV(home_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                //             DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                //         }
+                //     }
+                // }
+                // current_chunk = get_chunk
+                
 
             EndMode3D();
-            //DrawText(TextFormat("current chunk coords: x:%d, y:%d, z:%d ", current_chunk), 190, 200, 20, LIGHTGRAY);
+            DrawText(TextFormat("current chunk coords: x:%d, y:%d, z:%d ", current_chunk->pos.x, current_chunk->pos.y, current_chunk->pos.z), 190, 200, 20, LIGHTGRAY);
+            //DrawText(TextFormat("current block coords: x:%d, y:%d, z:%d ", current_chunk->blocks[0]->x, current_chunk->pos.y, current_chunk->pos.z), 190, 200, 20, LIGHTGRAY);
+            DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", camera.position.x, camera.position.y, camera.position.z), 40, 20, 20, LIGHTGRAY);
+            DrawText(TextFormat("cx:%d cy:%d cz:%d", cx,cy,cz), 450, 20, 20, WHITE);
+
+
             DrawFPS(10, 10);
         EndDrawing();
     }
@@ -213,18 +341,60 @@ void remove_chunk(ChunkTable *table, int cx, int cy, int cz) {
 
 void create_chunk(ChunkTable *table, int cx, int cy, int cz) {
     Chunk new_chunk;
+    // for (int x = 0; x < CHUNK_SIZE; x++) {
+    //     for (int y = 0; y < CHUNK_SIZE; y++) {
+    //         for (int z = 0; z < CHUNK_SIZE; z++) {
+    //             new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
+    //             new_chunk.blocks[x][y][z].pos = (Vector3) { 
+    //                 x + (cx * CHUNK_SIZE), 
+    //                 (0 - y) + (cy * CHUNK_SIZE), 
+    //                 z + (cz * CHUNK_SIZE)};
+    //         }
+    //     }
+    // }
+    /* This is interesting. Cubes in raylib have their origin in the center, so I need to account for that when
+        placing blocks inside chunks. The first chunk will have the center at (0,0,0), so I need to start at (-8,0,0)
+        and end at (8,0,0). But the problem is that those blocks are also drawn from center, so I actually need to 
+        compensate for that */
+    float Xblock = -(CHUNK_SIZE / 2) + 0.5f;
+    float Yblock = -(CHUNK_SIZE / 2) + 0.5f;
+    float Zblock = -(CHUNK_SIZE / 2) + 0.5f;
     for (int x = 0; x < CHUNK_SIZE; x++) {
         for (int y = 0; y < CHUNK_SIZE; y++) {
             for (int z = 0; z < CHUNK_SIZE; z++) {
                 new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
-                new_chunk.blocks[x][y][z].pos = (Vector3) { 
-                    x + (cx * CHUNK_SIZE), 
-                    (0 - y) + (cy * CHUNK_SIZE), 
-                    z + (cz * CHUNK_SIZE)};
+                new_chunk.blocks[x][y][z].pos = (Vector3) { cx + Xblock, cy + Yblock, cz + Zblock };
+                Zblock++;
             }
+            Zblock = -(CHUNK_SIZE / 2) + 0.5f;
+            Yblock++;
         }
+        Yblock = -(CHUNK_SIZE / 2) + 0.5f;
+        Xblock++;
     }
+
+    // float Xblock = 0.0f;
+    // float Yblock = 0.0f;
+    // float Zblock = 0.0f;
+    // for (int x = 0; x < CHUNK_SIZE; x++) {
+    //     for (int y = 0; y < CHUNK_SIZE; y++) {
+    //         for (int z = 0; z < CHUNK_SIZE; z++) {
+    //             new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
+    //             new_chunk.blocks[x][y][z].pos = (Vector3) { cx + Xblock, cy + Yblock, cz + Zblock };
+    //             z++;
+    //             new_chunk.blocks[x][y][z].pos = (Vector3) { cx - Xblock, cy - Yblock, cz - Zblock };
+    //         }
+    //         Zblock = 0.0f;
+    //         Yblock++;
+    //     }
+    //     Yblock = 0.0f;
+    //     Xblock++;
+    // }
+
+    new_chunk.pos = (Vector3) { cx, cy, cz };
     add_chunk(table, cx, cy, cz, new_chunk);
+
+    return;
 }
 
 Chunk *get_current_chunk(ChunkTable *table, int cx, int cy, int cz) {
