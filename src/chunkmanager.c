@@ -1,8 +1,7 @@
-#include "chunkmanager.h"
-#include "myhash.h"
+#include "include.h"
 
-
-
+// int nearbyChunkCount = ((CHUNK_RENDER_MAX * 2) + 1) ^ 3; this is bitwise OR lol
+int nearbyChunkCount = 125;
 
 //hash_index takes the resut of the hash function, and makes it a number that can fit in my hash table.
 size_t hash_index(uint64_t key) {
@@ -109,12 +108,16 @@ void create_chunk(ChunkTable *table, int cx, int cy, int cz) {
                     new_chunk.world_pos.y + baseY, 
                     new_chunk.world_pos.z + baseZ };
 
-                if (new_chunk.blocks[x][y][z].pos.y <= 0) {
-                    new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
-                } else {
-                    new_chunk.blocks[x][y][z].blockType = BLOCK_AIR;
-                }
-                
+                // if (new_chunk.blocks[x][y][z].pos.y <= 0) {
+                //     new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
+                // } else {
+                //     new_chunk.blocks[x][y][z].blockType = BLOCK_AIR;
+                // }
+                /* I need to use absolute integer values for deciding block type, esp. for noise sampling in future */
+                int absolute_x = (cx * CHUNK_SIZE) + x - HALF_CHUNK;
+                int absolute_y = (cy * CHUNK_SIZE) + y - (HALF_CHUNK - 1);
+                int absolute_z = (cz * CHUNK_SIZE) + z - HALF_CHUNK;
+                new_chunk.blocks[x][y][z].blockType = DecideBlockType(&new_chunk, absolute_x, absolute_y, absolute_z);
 
                 baseZ++;
             }
@@ -137,4 +140,18 @@ Chunk *get_current_chunk(ChunkTable *table, int cx, int cy, int cz) {
         chunk = get_chunk(table, cx, cy, cz);
     }
     return chunk;
+}
+
+void UpdateNearbyChunks(int cx, int cy, int cz) {
+    memset(nearbyChunks, 0, sizeof(nearbyChunks));
+    int tracker = 0;
+    for (int x = -CHUNK_RENDER_MAX + cx; x <= CHUNK_RENDER_MAX + cx; x++) {
+        for (int y = -CHUNK_RENDER_MAX + cy; y <= CHUNK_RENDER_MAX + cy; y++) {
+            for (int z = -CHUNK_RENDER_MAX + cz; z <= CHUNK_RENDER_MAX + cz; z++) {
+                nearbyChunks[tracker++] = (Vector3) { x, y, z };
+                //tracker++;
+            }
+        }
+    }
+    nearbyChunkCount = tracker;
 }

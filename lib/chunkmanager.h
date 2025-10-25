@@ -1,21 +1,22 @@
 #ifndef CHUNKMANAGER_H
 #define CHUNKMANAGER_H
 
-#include <stdlib.h>
-#include "raymath.h"
-
+#include "include.h"
 
 #define CHUNK_SIZE 16
 #define HALF_CHUNK 8
 #define HASH_TABLE_SIZE 1024
-#define CHUNK_RENDER_MAX 1
+#define CHUNK_RENDER_MAX 2
 
-enum BlockType {
+Vector3 nearbyChunks [1000]; //can update the amount later
+int nearbyChunkCount;
+
+typedef enum BlockType {
     BLOCK_AIR,
     BLOCK_GRASS,
     BLOCK_DIRT,
     BLOCK_STONE,
-};
+}BlockType;
 
 typedef struct Block {
     Vector3 pos;
@@ -45,5 +46,6 @@ Chunk *get_chunk(ChunkTable *table, int cx, int cy, int cz);
 void remove_chunk(ChunkTable *table, int cx, int cy, int cz);
 void create_chunk(ChunkTable *table, int cx, int cy, int cz);
 Chunk *get_current_chunk(ChunkTable *table, int cx, int cy, int cz);
+void UpdateNearbyChunks(int cx, int cy, int cz);
 
 #endif
