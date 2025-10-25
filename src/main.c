@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #define CHUNK_SIZE 16
+#define HALF_CHUNK 8
 #define HASH_TABLE_SIZE 1024
 #define CHUNK_RENDER_MAX 2
 
@@ -64,26 +65,13 @@ int main(void) {
 
     ChunkTable chunkTable = { 0 };
 
-    //make base chunk
-    // Chunk homeChunk;
-    // for (int x = 0; x < CHUNK_SIZE; x++) {
-    //     for (int y = 0; y < CHUNK_SIZE; y++) {
-    //         for (int z = 0; z < CHUNK_SIZE; z++) {
-    //             homeChunk.blocks[x][y][z].blockType = BLOCK_DIRT;
-    //             homeChunk.blocks[x][y][z].pos = (Vector3) { (x * -1) - 1, (y * -1) - 1, (z * -1) - 1 };
-    //         }
-    //     }
-    // }
-
-    // add_chunk(&chunkTable, 0, 0, 0, homeChunk);
-
-    //get_current_chunk(chunkTable, )
 
     // next I want to update the current chunk as the player moves
-    int cx = floor(camera.position.x / CHUNK_SIZE);
-    int cy = floor((camera.position.y - 2) / CHUNK_SIZE);
-    int cz = floor(camera.position.z / CHUNK_SIZE);
+    int cx = (int)floor((camera.position.x + HALF_CHUNK) / CHUNK_SIZE);
+    int cy = (int)floor((camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
+    int cz = (int)floor((camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
     Chunk *current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
+    Chunk *home_chunk = current_chunk;
     
 
     DisableCursor();
@@ -94,7 +82,6 @@ int main(void) {
         // Some default standard keyboard/mouse inputs are hardcoded to simplify use
         // For advanced camera controls, it's recommended to compute camera movement manually
         UpdateCamera(&camera, cameraMode);                  // Update camera
-
 /*
         // Camera PRO usage example (EXPERIMENTAL)
         // This new camera function allows custom movement/rotation values to be directly provided
@@ -141,11 +128,30 @@ int main(void) {
         // }
         /* I am going to do something different here. I will use cx cy and cz as my integer coords for my hash function, and 
             I will translate those to world coords upon creation */
+
+        // if ((int)camera.position.x < 16 && (int)camera.position.x >= 0 || 
+        //     (int)camera.position.x > -16 && (int)camera.position.x < 0) {
+        //     cx = (int)(camera.position.x / (CHUNK_SIZE / 2));
+        // } else {
+        //     cx = (int)(camera.position.x / CHUNK_SIZE);
+        // }
+        // if (camera.position.y < 16 || camera.position.y > -16) {
+        //     cy = (int)(camera.position.y / (CHUNK_SIZE / 2));
+        // } else {
+        //     cy = (int)(camera.position.y / CHUNK_SIZE);
+        // }
+        // if (camera.position.z < 16 || camera.position.z > -16) {
+        //     cz = (int)(camera.position.z / (CHUNK_SIZE / 2));
+        // } else {
+        //     cz = (int)(camera.position.z / CHUNK_SIZE);
+        // }
         
 
-        int cx = (int)(camera.position.x / (CHUNK_SIZE / 2));
-        int cy = (int)((camera.position.y - 2) / (CHUNK_SIZE / 2));
-        int cz = (int)(camera.position.z / (CHUNK_SIZE / 2));
+
+        cx = (int)floor((camera.position.x + HALF_CHUNK) / CHUNK_SIZE);
+        cy = (int)floor((camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
+        cz = (int)floor((camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
+
         Chunk *current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
         // if (floor(camera.position.x / CHUNK_SIZE) > 0) {
         //     cx = floor(camera.position.x / CHUNK_SIZE);
@@ -167,29 +173,7 @@ int main(void) {
 
 
         //current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
-        // if (floor(camera.position.x / (CHUNK_SIZE / 2)) >= 0) {
-        //     cx = floor(camera.position.x / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
-        // } else if (floor(camera.position.x / (CHUNK_SIZE / 2)) < 0) {
-        //     cx = ceil(camera.position.x / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
-        // }
 
-        // if (floor(camera.position.y / (CHUNK_SIZE / 2)) >= 0) {
-        //     cy = floor((camera.position.y - 2) / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
-        // } else if (floor(camera.position.y / (CHUNK_SIZE / 2)) < 0) {
-        //     cy = ceil(camera.position.y / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
-        // }
-
-        // if (floor(camera.position.z / (CHUNK_SIZE / 2)) >= 0) {
-        //     cz = floor(camera.position.z / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
-        // } else if (floor(camera.position.z / (CHUNK_SIZE / 2)) < 0) {
-        //     cz = ceil(camera.position.z / (CHUNK_SIZE / 2)) * CHUNK_SIZE;
-        // }
-        // current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
-
-        // cx = floor((camera.position.x / CHUNK_SIZE)) * CHUNK_SIZE;
-        // cy = floor((camera.position.y - 2) / CHUNK_SIZE);
-        // cz = floor(camera.position.z / CHUNK_SIZE);
-        // current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
 
         BeginDrawing();
             ClearBackground(BLACK);
@@ -279,7 +263,7 @@ int main(void) {
                 
 
             EndMode3D();
-            DrawText(TextFormat("current chunk coords: x:%d, y:%d, z:%d ", current_chunk->world_pos.x, current_chunk->world_pos.y, current_chunk->world_pos.z), 190, 200, 20, LIGHTGRAY);
+            DrawText(TextFormat("current chunk coords: x:%f, y:%d, z:%d ", current_chunk->world_pos.x, current_chunk->world_pos.y, current_chunk->world_pos.z), 190, 200, 20, LIGHTGRAY);
             //DrawText(TextFormat("current block coords: x:%d, y:%d, z:%d ", current_chunk->blocks[0]->x, current_chunk->pos.y, current_chunk->pos.z), 190, 200, 20, LIGHTGRAY);
             DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", camera.position.x, camera.position.y, camera.position.z), 40, 20, 20, LIGHTGRAY);
             DrawText(TextFormat("cx:%d cy:%d cz:%d", cx,cy,cz), 450, 20, 20, WHITE);
@@ -406,26 +390,6 @@ void create_chunk(ChunkTable *table, int cx, int cy, int cz) {
         baseY = -(CHUNK_SIZE / 2) + 0.5f;
         baseX++;
     }
-
-    // float baseX = 0.0f;
-    // float baseY = 0.0f;
-    // float baseZ = 0.0f;
-    // for (int x = 0; x < CHUNK_SIZE; x++) {
-    //     for (int y = 0; y < CHUNK_SIZE; y++) {
-    //         for (int z = 0; z < CHUNK_SIZE; z++) {
-    //             new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
-    //             new_chunk.blocks[x][y][z].pos = (Vector3) { cx + baseX, cy + baseY, cz + baseZ };
-    //             z++;
-    //             new_chunk.blocks[x][y][z].pos = (Vector3) { cx - baseX, cy - baseY, cz - baseZ };
-    //         }
-    //         baseZ = 0.0f;
-    //         baseY++;
-    //     }
-    //     baseY = 0.0f;
-    //     baseX++;
-    // }
-
-
     add_chunk(table, cx, cy, cz, new_chunk);
 
     return;
