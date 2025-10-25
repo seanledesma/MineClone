@@ -8,7 +8,7 @@
 #define CHUNK_SIZE 16
 #define HALF_CHUNK 8
 #define HASH_TABLE_SIZE 1024
-#define CHUNK_RENDER_MAX 2
+#define CHUNK_RENDER_MAX 1
 
 enum BlockType {
     BLOCK_AIR,

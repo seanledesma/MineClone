@@ -1,4 +1,6 @@
 // I decided to start over from scratch
+#include <string.h>
+
 #include "raylib.h" 
 #include "rcamera.h"
 
@@ -7,7 +9,11 @@
 
 
 
-
+Vector3 nearbyChunks [1000]; //can update the amount later
+int nearbyChunkCount = 125;
+// int nearbyChunkCount = ((CHUNK_RENDER_MAX * 2) + 1) ^ 3; this is bitwise OR lol
+// nearbyChunkCount *= nearbyChunkCount;
+// nearbyChunkCount *= nearbyChunkCount;
 
 
 
@@ -16,7 +22,12 @@ bool IsBlockAir(Chunk* chunk, int x, int y, int z) {
     // need to see if block is even in current chunk
     // will need to handle this different when making more chunks visible
     //if (x <)
-
+    // gonna do some safeguarding to prevent checking outside current chunk
+    if (x < 0 || x > CHUNK_SIZE ||
+        y < 0 || y > CHUNK_SIZE ||
+        z < 0 || z > CHUNK_SIZE) {
+            return false;
+        }
 
     if (chunk->blocks[x][y][z].blockType == BLOCK_AIR) {
         return true;
@@ -24,12 +35,26 @@ bool IsBlockAir(Chunk* chunk, int x, int y, int z) {
     return false;
 }
 
+void UpdateNearbyChunks(int cx, int cy, int cz) {
+    memset(nearbyChunks, 0, sizeof(nearbyChunks));
+    int tracker = 0;
+    for (int x = -CHUNK_RENDER_MAX + cx; x <= CHUNK_RENDER_MAX + cx; x++) {
+        for (int y = -CHUNK_RENDER_MAX + cy; y <= CHUNK_RENDER_MAX + cy; y++) {
+            for (int z = -CHUNK_RENDER_MAX + cz; z <= CHUNK_RENDER_MAX + cz; z++) {
+                nearbyChunks[tracker++] = (Vector3) { x, y, z };
+                //tracker++;
+            }
+        }
+    }
+    nearbyChunkCount = tracker;
+}
+
 
 
 
 int main(void) {
-    const int screenWidth = 1280;
-    const int screenHeight = 720;
+    const int screenWidth = 1920;
+    const int screenHeight = 1080;
     InitWindow(screenWidth, screenHeight, "MineClone");
 
     //LOGIC
@@ -52,6 +77,26 @@ int main(void) {
     int cz = (int)floor((camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
     Chunk *current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
     
+    //let's see how we can keep a list of nearby chunks we want to render and only update it if we enter a new chunk
+    // may need to update my get chunk function to take key, make it faster??
+    // Vector3 nearbyChunks [1000]; //can update the amount later
+    // int nearbyChunkCount = ((CHUNK_RENDER_MAX * 2) + 1) ^ 3;
+
+    // for (int i = 0; i < nearbyChunkCount + 1; i++) {
+    //     for (int x = -CHUNK_RENDER_MAX; x < CHUNK_RENDER_MAX; x++) {
+    //         for (int y = -CHUNK_RENDER_MAX; y < CHUNK_RENDER_MAX; y++) {
+    //             for (int z = -CHUNK_RENDER_MAX; z < CHUNK_RENDER_MAX; z++) {
+    //                 nearbyChunks[i] = (Vector3) { x, y, z };
+    //             }
+    //         }
+    //     }
+    // }
+    UpdateNearbyChunks(cx, cy, cz);
+    int prevcx = cx;
+    int prevcy = cy;
+    int prevcz = cz;
+
+
     int blocksRendered = 0;
     DisableCursor();
     SetTargetFPS(120);
@@ -110,7 +155,15 @@ int main(void) {
         cy = (int)floor((camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
         cz = (int)floor((camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
 
-        current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
+        //current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
+        //nearbyChunks[0] = (Vector3) { cx, cy, cz };
+
+        if (prevcx != cx || prevcy != cy || prevcz != cz) {
+            UpdateNearbyChunks(cx, cy, cz);
+            prevcx = cx;
+            prevcy = cy;
+            prevcz = cz;
+        }
         
 
         BeginDrawing();
@@ -176,32 +229,62 @@ int main(void) {
                     // current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
                 //}
 
-                DrawCubeWiresV(current_chunk->world_pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, PINK);
-                for (int x = 0; x < CHUNK_SIZE; x++) {
-                    for (int y = 0; y < CHUNK_SIZE; y++) {
-                        for (int z = 0; z < CHUNK_SIZE; z++) {
-                            //DrawCubeV(home_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
-                            //DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
-                            // need to check to see if block I will draw is even visible (has a neighbor that is block air)
-                            bool isVisible = false;
-                            if (IsBlockAir(current_chunk, x+1, y, z)) isVisible = true;
-                            if (IsBlockAir(current_chunk, x-1, y, z)) isVisible = true;
-                            if (IsBlockAir(current_chunk, x, y+1, z)) isVisible = true;
-                            if (IsBlockAir(current_chunk, x, y-1, z)) isVisible = true;
-                            if (IsBlockAir(current_chunk, x, y, z+1)) isVisible = true;
-                            if (IsBlockAir(current_chunk, x, y, z-1)) isVisible = true;
-                            
+                for (int i = 0; i < nearbyChunkCount; i++) {
+                    current_chunk = get_current_chunk(&chunkTable, nearbyChunks[i].x, nearbyChunks[i].y, nearbyChunks[i].z);
+                    DrawCubeWiresV(current_chunk->world_pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, PINK);
+                    for (int x = 0; x < CHUNK_SIZE; x++) {
+                        for (int y = 0; y < CHUNK_SIZE; y++) {
+                            for (int z = 0; z < CHUNK_SIZE; z++) {
+                                //DrawCubeV(home_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                                //DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                                // need to check to see if block I will draw is even visible (has a neighbor that is block air)
+                                bool isVisible = false;
+                                if (IsBlockAir(current_chunk, x+1, y, z)) isVisible = true;
+                                if (IsBlockAir(current_chunk, x-1, y, z)) isVisible = true;
+                                if (IsBlockAir(current_chunk, x, y+1, z)) isVisible = true;
+                                if (IsBlockAir(current_chunk, x, y-1, z)) isVisible = true;
+                                if (IsBlockAir(current_chunk, x, y, z+1)) isVisible = true;
+                                if (IsBlockAir(current_chunk, x, y, z-1)) isVisible = true;
+                                
 
-                            if (isVisible) {
-                                if (current_chunk->blocks[x][y][z].blockType == BLOCK_DIRT) {
-                                    DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
-                                    DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
-                                    blocksRendered++;
+                                if (isVisible) {
+                                    if (current_chunk->blocks[x][y][z].blockType == BLOCK_DIRT) {
+                                        DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                                        DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                                        blocksRendered++;
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                // DrawCubeWiresV(current_chunk->world_pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, PINK);
+                // for (int x = 0; x < CHUNK_SIZE; x++) {
+                //     for (int y = 0; y < CHUNK_SIZE; y++) {
+                //         for (int z = 0; z < CHUNK_SIZE; z++) {
+                //             //DrawCubeV(home_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                //             //DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                //             // need to check to see if block I will draw is even visible (has a neighbor that is block air)
+                //             bool isVisible = false;
+                //             if (IsBlockAir(current_chunk, x+1, y, z)) isVisible = true;
+                //             if (IsBlockAir(current_chunk, x-1, y, z)) isVisible = true;
+                //             if (IsBlockAir(current_chunk, x, y+1, z)) isVisible = true;
+                //             if (IsBlockAir(current_chunk, x, y-1, z)) isVisible = true;
+                //             if (IsBlockAir(current_chunk, x, y, z+1)) isVisible = true;
+                //             if (IsBlockAir(current_chunk, x, y, z-1)) isVisible = true;
+                            
+
+                //             if (isVisible) {
+                //                 if (current_chunk->blocks[x][y][z].blockType == BLOCK_DIRT) {
+                //                     DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                //                     DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                //                     blocksRendered++;
+                //                 }
+                //             }
+                //         }
+                //     }
+                // }
                 //current_chunk = get_chunk(&chunkTable, visible_chunk_positions[i].x, visible_chunk_positions[i].y, visible_chunk_positions[i].z);
                 //current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
 
