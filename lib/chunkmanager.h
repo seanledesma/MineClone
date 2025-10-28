@@ -8,8 +8,11 @@
 #define HASH_TABLE_SIZE 1024
 #define CHUNK_RENDER_MAX 2
 
-Vector3 nearbyChunks [1000]; //can update the amount later
-int nearbyChunkCount;
+#define CHUNK_VIEW_DISTANCE (2 * CHUNK_RENDER_MAX + 1)
+#define NEARBY_CHUNK_ARRAY_SIZE (CHUNK_VIEW_DISTANCE * CHUNK_VIEW_DISTANCE * CHUNK_VIEW_DISTANCE)
+
+extern Vector3 nearbyChunks [NEARBY_CHUNK_ARRAY_SIZE]; 
+extern int nearbyChunkCount;
 
 typedef enum BlockType {
     BLOCK_AIR,

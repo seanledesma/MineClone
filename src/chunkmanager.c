@@ -1,7 +1,8 @@
 #include "include.h"
 
-// int nearbyChunkCount = ((CHUNK_RENDER_MAX * 2) + 1) ^ 3; this is bitwise OR lol
-int nearbyChunkCount = 125;
+Vector3 nearbyChunks [NEARBY_CHUNK_ARRAY_SIZE]; 
+//int nearbyChunkCount = ((CHUNK_RENDER_MAX * 2) + 1) ^ 3; //this is bitwise OR lol
+int nearbyChunkCount = NEARBY_CHUNK_ARRAY_SIZE;
 
 //hash_index takes the resut of the hash function, and makes it a number that can fit in my hash table.
 size_t hash_index(uint64_t key) {

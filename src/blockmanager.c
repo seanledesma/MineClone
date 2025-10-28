@@ -6,9 +6,9 @@ bool IsBlockAir(Chunk* chunk, int x, int y, int z) {
     // will need to handle this different when making more chunks visible
     //if (x <)
     // gonna do some safeguarding to prevent checking outside current chunk
-    if (x < 0 || x > CHUNK_SIZE ||
-        y < 0 || y > CHUNK_SIZE ||
-        z < 0 || z > CHUNK_SIZE) {
+    if (x < 0 || x >= CHUNK_SIZE ||
+        y < 0 || y >= CHUNK_SIZE ||
+        z < 0 || z >= CHUNK_SIZE) {
             return false;
         }
 

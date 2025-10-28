@@ -2,8 +2,8 @@
 
 
 int main(void) {
-    const int screenWidth = 1920;
-    const int screenHeight = 1080;
+    const int screenWidth = 1280;
+    const int screenHeight = 720;
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, "raymine v0.0.2");
 
@@ -132,6 +132,10 @@ int main(void) {
                 }
 
             EndMode3D();
+
+            // crosshairs
+            DrawLine(GetScreenWidth() / 2, GetScreenHeight() / 2 - 10, GetScreenWidth() / 2, GetScreenHeight() / 2 + 10, WHITE);
+            DrawLine(GetScreenWidth() / 2 - 10, GetScreenHeight() / 2, GetScreenWidth() / 2 + 10, GetScreenHeight() / 2, WHITE);
             //DrawText(TextFormat("current chunk coords: x:%d, y:%d, z:%d ", current_chunk->world_pos.x, current_chunk->world_pos.y, current_chunk->world_pos.z), 190, 200, 20, LIGHTGRAY);
             //DrawText(TextFormat("current block coords: x:%d, y:%d, z:%d ", current_chunk->blocks[0]->x, current_chunk->pos.y, current_chunk->pos.z), 190, 200, 20, LIGHTGRAY);
             DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", camera.position.x, camera.position.y, camera.position.z), 40, 20, 20, LIGHTGRAY);
@@ -150,5 +154,3 @@ int main(void) {
 
     return 0;       
 }
-
-

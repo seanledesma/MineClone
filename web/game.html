@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MineClone</title>
+    <style>
+        /* Global styles */
+        html {
+            height: 100%;
+        }
+
+        body {
+            /* Fallback dirt color */
+            background-color: #5E3C25;
+            /* NEW WORKING repeating dirt block texture */
+            background-image: url('./dirt.png');
+            background-repeat: repeat;
+            /* Make space for the grass banner */
+            padding-top: 128px;
+            margin: 0;
+            font-family: 'Tahoma', 'Verdana', sans-serif;
+            position: relative;
+            min-height: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Grass banner at the top */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 128px;
+            /* NEW WORKING repeating grass block top texture */
+            background-image: url('./grass_full.png');
+            background-repeat: repeat-x;
+            background-position: top left;
+            /* Place it behind the page content but over the dirt */
+            z-index: -1; 
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        /* Simple text logo, you can customize this */
+        h1 {
+            font-family: 'Arial', sans-serif;
+            font-weight: bold;
+            font-size: 3em;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            margin: 0;
+        }
+
+        /* Windows XP Window Style */
+        .xp-window {
+            /* Sized to fit 800px canvas + padding/borders */
+            max-width: 828px; 
+            width: 95%;
+            margin: 1rem auto;
+            /* XP-style outer border */
+            border: 2px solid;
+            border-top-color: #A6D0F3;
+            border-left-color: #A6D0F3;
+            border-right-color: #001A83;
+            border-bottom-color: #001A83;
+            background: #ECE9D8;
+            border-radius: 5px;
+            box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .title-bar {
+            /* Classic blue gradient */
+            background: linear-gradient(to bottom, #005CFE, #4A8CF7, #005CFE);
+            color: white;
+            font-family: 'Tahoma', 'Verdana', sans-serif;
+            font-weight: bold;
+            padding: 4px 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 3px 3px 0 0;
+            user-select: none;
+        }
+
+        .title-bar-text {
+            padding-left: 5px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        }
+
+        .title-bar-controls {
+            display: flex;
+        }
+
+        /* --- UPDATED XP BUTTON STYLES --- */
+        .xp-button {
+            width: 21px; /* Fixed width */
+            height: 21px; /* Fixed height */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 3px;
+            border-radius: 3px;
+            box-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            color: white;
+            font-family: 'Arial Black', 'Tahoma', sans-serif; /* Bold font */
+            font-weight: bold;
+            font-size: 14px;
+            user-select: none;
+            cursor: default; /* Looks more like a window control */
+        }
+        
+        .minimize-button {
+            background: #005CFE;
+            border: 1px solid #A6D0F3; /* White-ish outline */
+            font-size: 16px;
+            line-height: 16px; 
+            padding-bottom: 5px; /* Nudge the '_' down */
+        }
+        
+        .maximize-button {
+            background: #005CFE;
+            border: 1px solid #A6D0F3; /* White-ish outline */
+            font-size: 12px; /* Make the square symbol look right */
+            line-height: 12px;
+        }
+
+        .close-button {
+            background: #E81123;
+            border: 1px solid #F08A93; /* White-ish/pink outline */
+            font-size: 14px;
+            line-height: 14px;
+        }
+        .close-button:hover {
+            background: #F04A58;
+        }
+        .minimize-button:hover, .maximize-button:hover {
+            background: #4A8CF7;
+        }
+        /* --- END OF BUTTON UPDATES --- */
+
+
+        .window-body {
+            /* This holds the canvas and loading elements */
+            padding: 10px;
+            /* Black background for the game, as in your original file */
+            background: #000;
+            border: 1px solid #7F9DB9;
+            margin: 2px;
+            /* Make the canvas responsive inside this container */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Emscripten required styles from your game.html */
+        .emscripten { 
+            padding-right: 0; 
+            margin-left: auto; 
+            margin-right: auto; 
+            display: block; 
+            text-align: center;
+        }
+        .spinner { 
+            height: 30px; 
+            width: 30px; 
+            margin: 10px auto;
+            display: inline-block; 
+            vertical-align: top; 
+            animation: rotation 0.8s linear infinite;
+            /* Classic dirt block color */
+            border-left: 5px solid #8B4513; 
+            border-right: 5px solid #8B4513;
+            border-bottom: 5px solid #8B4513; 
+            /* Light gray, like stone */
+            border-top: 5px solid #B0B0B0;
+            border-radius: 100%; 
+            background-color: #000; 
+        }
+        @keyframes rotation { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        #status { 
+            /* White text for visibility on black bg */
+            color: #FFFFFF; 
+            text-align: center; 
+            padding: 10px; 
+            font-family: 'Arial', sans-serif;
+            font-weight: bold;
+        }
+        
+        #progress { 
+            width: 300px; 
+            margin: 10px auto; 
+        }
+        
+        /* The canvas itself */
+        canvas.emscripten { 
+            border: 0 none; 
+            background-color: #000;
+            /* Make canvas responsive */
+            width: 100%;
+            height: auto;
+            max-width: 800px; /* Max size of the game */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MineClone</h1>
+        </header>
+
+        <!-- This is the XP window frame -->
+        <div class="xp-window">
+            <div class="title-bar">
+                <span class="title-bar-text">MineClone</span>
+                <div class="title-bar-controls">
+                    <!-- Updated Buttons -->
+                    <div class="xp-button minimize-button">_</div>
+                    <div class="xp-button maximize-button">▫</div>
+                    <div class="xp-button close-button">X</div> 
+                </div>
+            </div>
+            
+            <!-- This body holds the game, transplanted from your game.html -->
+            <div class="window-body">
+                <div class="spinner" id="spinner"></div>
+                <div class="emscripten" id="status">Downloading...</div>
+                <div class="emscripten">
+                    <progress hidden id="progress" max="100" value="0"></progress>
+                </div>
+                
+                <!-- The canvas for your Raylib game -->
+                <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Emscripten scripts from your game.html -->
+    <script>
+        var statusElement = document.getElementById('status');
+        var progressElement = document.getElementById('progress');
+        var spinnerElement = document.getElementById('spinner');
+
+        var Module = {
+            print: function() {
+                var element = document.getElementById('output');
+                return function(text) {
+                    console.log(text);
+                };
+            }(),
+            canvas: (function() {
+                var canvas = document.getElementById('canvas');
+                canvas.addEventListener("webglcontextlost", function(e) {
+                    /* Use a custom modal here if you have one, instead of alert */
+                    console.error('WebGL context lost. You will need to reload the page.');
+                    e.preventDefault();
+                }, false);
+                return canvas;
+            })(),
+            setStatus: function(text) {
+                if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+                if (text === Module.setStatus.last.text) return;
+                var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+                var now = Date.now();
+                if (m && now - Module.setStatus.last.time < 30) return;
+                Module.setStatus.last.time = now;
+                Module.setStatus.last.text = text;
+                if (m) {
+                    text = m[1];
+                    progressElement.value = parseInt(m[2])*100;
+                    progressElement.max = parseInt(m[4])*100;
+                    progressElement.hidden = false;
+                    spinnerElement.hidden = false;
+                } else {
+                    progressElement.value = null;
+                    progressElement.max = null;
+                    progressElement.hidden = true;
+                    if (!text) spinnerElement.style.display = 'none';
+                }
+                statusElement.innerHTML = text;
+            },
+            totalDependencies: 0,
+            monitorRunDependencies: function(left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+            }
+        };
+        Module.setStatus('Downloading...');
+        window.onerror = function(msg, url, line, col, error) {
+           Module.setStatus('Exception thrown, see JavaScript console');
+           spinnerElement.style.display = 'none';
+           Module.setStatus = function(text) {
+               if (text) console.error('[post-exception status] ' + text);
+           };
+           // Also log the actual error
+           console.error('Error details:', msg, 'at', url, 'line', line, 'col', col, 'error', error);
+        };
+    </script>
+    <!-- This loads your actual game logic -->
+    <script async src="game.js"></script>
+   
+    <!-- Prevent arrow keys from scrolling (from your game.html) -->
+    <script>
+        window.addEventListener("keydown", function(e) {
+            // Added 32 (Space) just in case
+            if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+                e.preventDefault();
+            }
+        }, false);
+    </script>
+</body>
+</html>
+
