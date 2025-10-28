@@ -13,17 +13,32 @@ INCLUDES = -Ilib/ -Isrc/
 # Output binary name for native build
 NATIVE_OUTPUT = bin/build
 
+# --- NEW: Aggressive Warning and Sanitizer Flags for Debugging ---
+# This includes:
+# -Wall -Wextra: The standard set of common and extra warnings.
+# -Werror: Treats all warnings as errors, forcing clean code.
+# -Wpedantic: Strictly adheres to the standard.
+# -fsanitize=address: **Address Sanitizer (ASan)** - Catches use-after-free, buffer overflows, memory leaks, etc.
+# -fsanitize=undefined: **Undefined Behavior Sanitizer (UBSan)** - Catches things like signed integer overflow, unaligned pointer cast, etc.
+# -g: Generates debug information for use with tools like gdb or lldb.
+C_DEBUG_FLAGS = -Wall -Wextra -Werror -Wpedantic -g -fsanitize=address,undefined
+
 # --- Native Build Configuration ---
 
 # macOS-specific
 ifeq ($(OS_NAME),Darwin)
     COMPILER = clang
+    # Apply the new debug flags here
+    NATIVE_CFLAGS = $(C_DEBUG_FLAGS)
     NATIVE_LIBS = -Llib/ -framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL lib/libraylib.a
 endif
 
 # Linux-specific
 ifeq ($(OS_NAME),Linux)
     COMPILER = gcc
+    # Note: GCC supports most of these flags, but ASan may be slightly different.
+    # We will use GCC's version of the sanitizers.
+    NATIVE_CFLAGS = $(C_DEBUG_FLAGS)
     # Make sure you have libraylib.so or libraylib.a in your system path or /usr/lib
     NATIVE_LIBS = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 endif
@@ -52,9 +67,11 @@ all: build
 # Build native executable
 build:
 	@mkdir -p bin
-	$(COMPILER) $(CFILES) $(INCLUDES) -o $(NATIVE_OUTPUT) $(NATIVE_LIBS)
+	$(COMPILER) $(CFILES) $(INCLUDES) $(NATIVE_CFLAGS) -o $(NATIVE_OUTPUT) $(NATIVE_LIBS)
 
 # Build WebAssembly files (game.js, game.wasm, game.data)
+# Note: Sanitizers are not used for the web build as they significantly increase file size and complexity.
+# Emscripten has its own set of debug tools if needed.
 build_web:
 	@mkdir -p web
 	$(EMCC) -o $(WEB_OUTPUT) $(CFILES) $(WEB_FLAGS) $(INCLUDES) $(WEB_LIB_PATH) $(WEB_LIB)
@@ -71,15 +88,10 @@ run_web:
 	@echo "1. Make sure you have your 'index.html' file in the 'web' directory."
 	@echo "2. Navigate to the 'web' directory:"
 	@echo "   cd web"
-	@echo "3. Run a simple web server. If you have Python 3:"
-	@echo "   python3 -m http.server"
-	@echo "4. Open your browser and go to:"
-	@echo "   http://localhost:8000/index.html"
+	@echo "3. Run a simple HTTP server (e.g., 'python3 -m http.server' or 'npx http-server')."
+	@echo "4. Open your browser to the server address (e.g., http://localhost:8000/index.html)."
+	@echo "NOTE: This build uses Emscripten and needs to load files, so it can't run directly from file://."
 
-# --- Clean Target ---
+# Clean up build files
 clean:
-	@echo "Cleaning build files..."
-	rm -f $(NATIVE_OUTPUT)
-	rm -f web/game.js web/game.wasm web/game.data
-	# Also remove emscripten-generated html, just in case
-	rm -f web/game.html 
+	rm -rf bin web
