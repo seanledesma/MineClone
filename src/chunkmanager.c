@@ -15,7 +15,10 @@ void add_chunk(ChunkTable *table, int cx, int cy, int cz, Chunk chunk) {
 
     /* create new node (chunk entry) */
     ChunkEntry* new_entry = (ChunkEntry*)malloc(sizeof(ChunkEntry));
-    
+    if (!new_entry) {
+        //here i need to handle memory allocation failure
+        return;
+    }
     new_entry->key = chunk_hash(cx, cy, cz);
     new_entry->cx = cx;
     new_entry->cy = cy;
@@ -139,6 +142,10 @@ Chunk *get_current_chunk(ChunkTable *table, int cx, int cy, int cz) {
     if (chunk == NULL) {
         create_chunk(table, cx, cy, cz);
         chunk = get_chunk(table, cx, cy, cz);
+        //and if it fails:
+        if (chunk == NULL) {
+            return NULL;
+        }
     }
     return chunk;
 }

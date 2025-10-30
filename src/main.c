@@ -28,7 +28,8 @@ int main(void) {
 
     int cameraMode = CAMERA_FIRST_PERSON;
 
-    ChunkTable chunkTable = { 0 };
+    ChunkTable chunkTable;
+    memset(&chunkTable, 0, sizeof(ChunkTable));
 
 
     // next I want to update the current chunk as the player moves
@@ -94,9 +95,14 @@ int main(void) {
         BeginDrawing();
             ClearBackground(SKYBLUE);
             BeginMode3D(camera);
-
+                if (nearbyChunkCount < 0 || nearbyChunkCount > NEARBY_CHUNK_ARRAY_SIZE) {
+                    nearbyChunkCount = 0;
+                }
                 for (int i = 0; i < nearbyChunkCount; i++) {
                     current_chunk = get_current_chunk(&chunkTable, nearbyChunks[i].x, nearbyChunks[i].y, nearbyChunks[i].z);
+                    if (!current_chunk) {
+                        continue; //in case get_current_chunk fails, skip this loop
+                    }
                     DrawCubeWiresV(current_chunk->world_pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, BLACK);
                     for (int x = 0; x < CHUNK_SIZE; x++) {
                         for (int y = 0; y < CHUNK_SIZE; y++) {

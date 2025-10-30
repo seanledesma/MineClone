@@ -13,246 +13,375 @@
         body {
             /* Fallback dirt color */
             background-color: #5E3C25;
-            /* NEW WORKING repeating dirt block texture */
+            /* Medium-sized repeating dirt block texture */
             background-image: url('./dirt.png');
             background-repeat: repeat;
-            /* Make space for the grass banner */
-            padding-top: 128px;
+            background-size: 32px 32px; /* Smaller blocks - about 1/3 of previous */
             margin: 0;
+            padding: 20px;
             font-family: 'Tahoma', 'Verdana', sans-serif;
             position: relative;
-            min-height: 100%;
+            min-height: 100vh;
             box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         /* Grass banner at the top */
         body::before {
             content: '';
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            height: 128px;
-            /* NEW WORKING repeating grass block top texture */
+            height: 20px;
+            /* Smaller repeating grass block top texture */
             background-image: url('./grass_full.png');
             background-repeat: repeat-x;
             background-position: top left;
-            /* Place it behind the page content but over the dirt */
+            background-size: auto 20px; /* Smaller grass blocks */
             z-index: -1; 
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        /* Simple text logo, you can customize this */
-        h1 {
-            font-family: 'Arial', sans-serif;
-            font-weight: bold;
-            font-size: 3em;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-            margin: 0;
         }
 
         /* Windows XP Window Style */
         .xp-window {
-            /* Sized to fit 800px canvas + padding/borders */
-            max-width: 828px; 
-            width: 95%;
-            margin: 1rem auto;
-            /* XP-style outer border */
-            border: 2px solid;
-            border-top-color: #A6D0F3;
-            border-left-color: #A6D0F3;
-            border-right-color: #001A83;
-            border-bottom-color: #001A83;
+            /* Much larger, responsive window */
+            width: 90vw;
+            max-width: 1400px;
+            min-width: 800px;
+            height: 85vh;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            /* More accurate XP border colors */
+            border: 1px solid #0831D9;
+            border-radius: 8px 8px 4px 4px;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+                        0 4px 20px rgba(0, 0, 0, 0.6);
             background: #ECE9D8;
-            border-radius: 5px;
-            box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
         }
 
         .title-bar {
-            /* Classic blue gradient */
-            background: linear-gradient(to bottom, #005CFE, #4A8CF7, #005CFE);
+            /* Authentic Windows XP Luna blue gradient */
+            background: linear-gradient(to bottom, 
+                #0997FF 0%,
+                #0053EE 4%,
+                #0050EE 6%,
+                #06F 8%,
+                #06F 92%,
+                #0053EE 96%,
+                #0050EE 98%,
+                #06C 100%
+            );
             color: white;
-            font-family: 'Tahoma', 'Verdana', sans-serif;
+            font-family: 'Tahoma', sans-serif;
+            font-size: 11px;
             font-weight: bold;
-            padding: 4px 6px;
+            padding: 3px 5px 3px 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-radius: 3px 3px 0 0;
+            border-radius: 8px 8px 0 0;
             user-select: none;
+            height: 28px;
+            box-sizing: border-box;
+            /* Subtle inner shadow for depth */
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
         .title-bar-text {
-            padding-left: 5px;
-            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+            padding-left: 2px;
+            letter-spacing: 0.5px;
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+        }
+
+        /* Add small icon before title */
+        .title-bar-text::before {
+            content: '🎮';
+            font-size: 14px;
+            margin-right: 6px;
+            filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.5));
         }
 
         .title-bar-controls {
             display: flex;
+            gap: 2px;
         }
 
-        /* --- UPDATED XP BUTTON STYLES --- */
+        /* Authentic XP button styles */
         .xp-button {
-            width: 21px; /* Fixed width */
-            height: 21px; /* Fixed height */
+            width: 21px;
+            height: 21px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-left: 3px;
-            border-radius: 3px;
-            box-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            border-radius: 2px;
             color: white;
-            font-family: 'Arial Black', 'Tahoma', sans-serif; /* Bold font */
+            font-family: 'Marlett', 'Webdings', 'Arial', sans-serif;
+            font-size: 9px;
             font-weight: bold;
-            font-size: 14px;
             user-select: none;
-            cursor: default; /* Looks more like a window control */
+            cursor: pointer;
+            /* XP button gradient */
+            background: linear-gradient(to bottom, 
+                rgba(255, 255, 255, 0.3) 0%,
+                rgba(255, 255, 255, 0.1) 45%,
+                rgba(0, 0, 0, 0.05) 50%,
+                rgba(0, 0, 0, 0.1) 100%
+            );
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.5),
+                        0 1px 2px rgba(0, 0, 0, 0.2);
+            transition: all 0.1s ease;
         }
-        
-        .minimize-button {
-            background: #005CFE;
-            border: 1px solid #A6D0F3; /* White-ish outline */
-            font-size: 16px;
-            line-height: 16px; 
-            padding-bottom: 5px; /* Nudge the '_' down */
+
+        .xp-button:hover {
+            background: linear-gradient(to bottom, 
+                rgba(255, 255, 255, 0.4) 0%,
+                rgba(255, 255, 255, 0.2) 45%,
+                rgba(0, 0, 0, 0.05) 50%,
+                rgba(0, 0, 0, 0.15) 100%
+            );
+            border-color: rgba(255, 255, 255, 0.6);
         }
-        
-        .maximize-button {
-            background: #005CFE;
-            border: 1px solid #A6D0F3; /* White-ish outline */
-            font-size: 12px; /* Make the square symbol look right */
-            line-height: 12px;
+
+        .xp-button:active {
+            background: linear-gradient(to bottom, 
+                rgba(0, 0, 0, 0.1) 0%,
+                rgba(0, 0, 0, 0.05) 50%,
+                rgba(255, 255, 255, 0.1) 100%
+            );
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .minimize-button::before {
+            content: '0'; /* Marlett font minimize symbol */
+            display: block;
+            line-height: 8px;
+            padding-bottom: 4px;
+        }
+
+        .maximize-button::before {
+            content: '1'; /* Marlett font maximize symbol */
+            display: block;
+            font-size: 8px;
         }
 
         .close-button {
-            background: #E81123;
-            border: 1px solid #F08A93; /* White-ish/pink outline */
-            font-size: 14px;
-            line-height: 14px;
+            background: linear-gradient(to bottom, 
+                #FF9797 0%,
+                #F77 45%,
+                #E53935 50%,
+                #D32F2F 100%
+            );
+            border-color: rgba(255, 255, 255, 0.5);
         }
-        .close-button:hover {
-            background: #F04A58;
-        }
-        .minimize-button:hover, .maximize-button:hover {
-            background: #4A8CF7;
-        }
-        /* --- END OF BUTTON UPDATES --- */
 
+        .close-button:hover {
+            background: linear-gradient(to bottom, 
+                #FFB0B0 0%,
+                #FF8888 45%,
+                #F44336 50%,
+                #E53935 100%
+            );
+        }
+
+        .close-button::before {
+            content: 'r'; /* Marlett font close symbol */
+            display: block;
+            font-size: 9px;
+            font-weight: bold;
+        }
 
         .window-body {
-            /* This holds the canvas and loading elements */
-            padding: 10px;
-            /* Black background for the game, as in your original file */
+            /* Fill remaining space */
+            flex: 1;
+            padding: 3px; /* Much smaller padding */
             background: #000;
             border: 1px solid #7F9DB9;
             margin: 2px;
-            /* Make the canvas responsive inside this container */
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            position: relative;
+            overflow: hidden;
+            min-height: 0; /* Allow flex to shrink properly */
         }
 
-        /* Emscripten required styles from your game.html */
+        /* Emscripten required styles */
         .emscripten { 
             padding-right: 0; 
             margin-left: auto; 
             margin-right: auto; 
             display: block; 
             text-align: center;
+            z-index: 10; /* Above canvas but below overlay */
         }
+
         .spinner { 
-            height: 30px; 
-            width: 30px; 
-            margin: 10px auto;
+            height: 40px; 
+            width: 40px; 
+            margin: 15px auto;
             display: inline-block; 
             vertical-align: top; 
             animation: rotation 0.8s linear infinite;
-            /* Classic dirt block color */
-            border-left: 5px solid #8B4513; 
-            border-right: 5px solid #8B4513;
-            border-bottom: 5px solid #8B4513; 
-            /* Light gray, like stone */
-            border-top: 5px solid #B0B0B0;
+            border-left: 6px solid #8B4513; 
+            border-right: 6px solid #8B4513;
+            border-bottom: 6px solid #8B4513; 
+            border-top: 6px solid #B0B0B0;
             border-radius: 100%; 
             background-color: #000; 
         }
-        @keyframes rotation { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        @keyframes rotation { 
+            from { transform: rotate(0deg); } 
+            to { transform: rotate(360deg); } 
+        }
         
         #status { 
-            /* White text for visibility on black bg */
             color: #FFFFFF; 
             text-align: center; 
-            padding: 10px; 
+            padding: 12px; 
             font-family: 'Arial', sans-serif;
             font-weight: bold;
+            font-size: 14px;
         }
         
         #progress { 
-            width: 300px; 
-            margin: 10px auto; 
+            width: 400px; 
+            margin: 12px auto; 
         }
         
-        /* The canvas itself */
+        /* The canvas itself - fills the window tightly */
         canvas.emscripten { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             border: 0 none; 
             background-color: #000;
-            /* Make canvas responsive */
+            object-fit: fill; /* Stretch to fill - no black bars */
+        }
+
+        /* ============================================================
+           POINTER LOCK OVERLAY STYLES
+           ============================================================ */
+        #pointer-lock-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            height: auto;
-            max-width: 800px; /* Max size of the game */
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            cursor: pointer;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        }
+        
+        #pointer-lock-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        #pointer-lock-message {
+            background: rgba(0, 0, 0, 0.95);
+            padding: 50px 60px;
+            border: 4px solid #fff;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.4);
+        }
+
+        #pointer-lock-message .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: float 2s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        #pointer-lock-message .instruction {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        #pointer-lock-message .hint {
+            font-size: 18px;
+            color: #ccc;
+            margin-top: 20px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 900px) {
+            .xp-window {
+                width: 95vw;
+                min-width: 600px;
+            }
+        }
+
+        @media (max-height: 700px) {
+            .xp-window {
+                height: 90vh;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>MineClone</h1>
-        </header>
-
-        <!-- This is the XP window frame -->
-        <div class="xp-window">
-            <div class="title-bar">
-                <span class="title-bar-text">MineClone</span>
-                <div class="title-bar-controls">
-                    <!-- Updated Buttons -->
-                    <div class="xp-button minimize-button">_</div>
-                    <div class="xp-button maximize-button">▫</div>
-                    <div class="xp-button close-button">X</div> 
-                </div>
-            </div>
-            
-            <!-- This body holds the game, transplanted from your game.html -->
-            <div class="window-body">
-                <div class="spinner" id="spinner"></div>
-                <div class="emscripten" id="status">Downloading...</div>
-                <div class="emscripten">
-                    <progress hidden id="progress" max="100" value="0"></progress>
-                </div>
-                
-                <!-- The canvas for your Raylib game -->
-                <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    <!-- This is the XP window frame - takes up most of the screen -->
+    <div class="xp-window">
+        <div class="title-bar">
+            <span class="title-bar-text">MineClone</span>
+            <div class="title-bar-controls">
+                <div class="xp-button minimize-button"></div>
+                <div class="xp-button maximize-button"></div>
+                <div class="xp-button close-button"></div>
             </div>
         </div>
         
+        <!-- This body holds the game -->
+        <div class="window-body">
+            <!-- The canvas for your Raylib game - positioned absolutely to fill space -->
+            <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+
+            <!-- POINTER LOCK OVERLAY -->
+            <div id="pointer-lock-overlay">
+                <div id="pointer-lock-message">
+                    <div class="icon">🖱️</div>
+                    <div class="instruction">Click to Play</div>
+                    <div class="hint">Press ESC to release mouse</div>
+                </div>
+            </div>
+
+            <!-- Loading elements appear on top of canvas -->
+            <div class="spinner" id="spinner"></div>
+            <div class="emscripten" id="status">Downloading...</div>
+            <div class="emscripten">
+                <progress hidden id="progress" max="100" value="0"></progress>
+            </div>
+        </div>
     </div>
 
-    <!-- Emscripten scripts from your game.html -->
+    <!-- Emscripten scripts -->
     <script>
         var statusElement = document.getElementById('status');
         var progressElement = document.getElementById('progress');
         var spinnerElement = document.getElementById('spinner');
+        var pointerLockOverlay = document.getElementById('pointer-lock-overlay');
 
         var Module = {
             print: function() {
@@ -263,11 +392,63 @@
             }(),
             canvas: (function() {
                 var canvas = document.getElementById('canvas');
+                
+                // ============================================================
+                // POINTER LOCK FUNCTIONALITY
+                // ============================================================
+                
+                // Request pointer lock on canvas click
+                canvas.addEventListener('click', function() {
+                    canvas.requestPointerLock = canvas.requestPointerLock ||
+                                               canvas.mozRequestPointerLock ||
+                                               canvas.webkitRequestPointerLock;
+                    if (canvas.requestPointerLock) {
+                        canvas.requestPointerLock();
+                    }
+                });
+                
+                // Also allow clicking the overlay to start
+                pointerLockOverlay.addEventListener('click', function() {
+                    canvas.click();
+                });
+                
+                // Handle pointer lock state changes
+                function lockChangeAlert() {
+                    if (document.pointerLockElement === canvas ||
+                        document.mozPointerLockElement === canvas ||
+                        document.webkitPointerLockElement === canvas) {
+                        // Pointer is locked - hide overlay
+                        console.log('Pointer locked');
+                        pointerLockOverlay.classList.add('hidden');
+                    } else {
+                        // Pointer is unlocked - show overlay
+                        console.log('Pointer unlocked');
+                        pointerLockOverlay.classList.remove('hidden');
+                    }
+                }
+                
+                // Listen for pointer lock change events
+                document.addEventListener('pointerlockchange', lockChangeAlert, false);
+                document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
+                document.addEventListener('webkitpointerlockchange', lockChangeAlert, false);
+                
+                // Handle pointer lock errors
+                function lockError() {
+                    console.error('Pointer lock failed');
+                }
+                
+                document.addEventListener('pointerlockerror', lockError, false);
+                document.addEventListener('mozpointerlockerror', lockError, false);
+                document.addEventListener('webkitpointerlockerror', lockError, false);
+                
+                // ============================================================
+                // WEBGL CONTEXT LOST HANDLER
+                // ============================================================
                 canvas.addEventListener("webglcontextlost", function(e) {
-                    /* Use a custom modal here if you have one, instead of alert */
                     console.error('WebGL context lost. You will need to reload the page.');
                     e.preventDefault();
                 }, false);
+                
                 return canvas;
             })(),
             setStatus: function(text) {
@@ -305,17 +486,16 @@
            Module.setStatus = function(text) {
                if (text) console.error('[post-exception status] ' + text);
            };
-           // Also log the actual error
            console.error('Error details:', msg, 'at', url, 'line', line, 'col', col, 'error', error);
         };
     </script>
     <!-- This loads your actual game logic -->
     <script async src="game.js"></script>
    
-    <!-- Prevent arrow keys from scrolling (from your game.html) -->
+    <!-- Prevent arrow keys from scrolling -->
     <script>
         window.addEventListener("keydown", function(e) {
-            // Added 32 (Space) just in case
+            // Space, Left, Up, Right, Down arrows
             if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
                 e.preventDefault();
             }
@@ -323,4 +503,3 @@
     </script>
 </body>
 </html>
-
