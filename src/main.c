@@ -1,6 +1,34 @@
 #include "include.h"
 
 
+
+
+Vector3 RayCastTargetBlock(Camera* camera, Chunk* chunk) {
+    float maxDistance = 8.0f;
+    float stepSize = 0.05f; //how fine (?) to step through space, how frequent we are checking if we hit
+    
+    Vector3 rayDir = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+    Vector3 rayPos = Vector3Add(camera->position, Vector3Scale(rayDir, 0.1f));
+
+    for (float t = 0; t  < maxDistance; t += stepSize) {
+        Vector3 pos = Vector3Add(rayPos, Vector3Scale(rayDir, t));
+
+        int blockX = (int)floor(pos.x);
+        int blockY = (int)floor(pos.y);
+        int blockZ = (int)floor(pos.z);
+
+        if(blockX >= 0 && blockX < CHUNK_SIZE && 
+            blockY >= 0 && blockY < CHUNK_SIZE && 
+            blockZ >= 0 && blockZ < CHUNK_SIZE) {
+            
+            if(chunk->blocks[blockX][blockY][blockZ].blockType != BLOCK_AIR) {
+                return (Vector3) { blockX, blockY, blockZ };
+            }
+        }
+    }
+    return;
+}
+
 int main(void) {
     const int screenWidth = 1280;
     const int screenHeight = 720;
@@ -103,7 +131,12 @@ int main(void) {
                     if (!current_chunk) {
                         continue; //in case get_current_chunk fails, skip this loop
                     }
-                    DrawCubeWiresV(current_chunk->world_pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, BLACK);
+                    // Vector3 targetBlock = RayCastTargetBlock(&camera, current_chunk);
+                    // //DrawCubeWiresV(current_chunk->world_pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, BLACK);
+                    // if (current_chunk->blocks[(int)floor(targetBlock.x)][(int)floor(targetBlock.y)][(int)floor(targetBlock.z)].blockType != BLOCK_AIR) {
+                    //     DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
+                    // }
+                    
                     for (int x = 0; x < CHUNK_SIZE; x++) {
                         for (int y = 0; y < CHUNK_SIZE; y++) {
                             for (int z = 0; z < CHUNK_SIZE; z++) {
@@ -135,6 +168,12 @@ int main(void) {
                             }
                         }
                     }
+                    Vector3 targetBlock = RayCastTargetBlock(&camera, current_chunk);
+                    // if (current_chunk->blocks[(int)floor(targetBlock.x)][(int)floor(targetBlock.y)][(int)floor(targetBlock.z)].blockType == BLOCK_AIR) {
+                    //     DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
+                    // }
+                    DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
+
                 }
 
             EndMode3D();
