@@ -3,7 +3,7 @@
 
 
 
-Vector3 RayCastTargetBlock(Camera* camera, Chunk* chunk) {
+Vector3 RayCastTargetBlock(Camera* camera, ChunkTable* chunkTable) {
     float maxDistance = 8.0f;
     float stepSize = 0.05f; //how fine (?) to step through space, how frequent we are checking if we hit
     
@@ -12,21 +12,35 @@ Vector3 RayCastTargetBlock(Camera* camera, Chunk* chunk) {
 
     for (float t = 0; t  < maxDistance; t += stepSize) {
         Vector3 pos = Vector3Add(rayPos, Vector3Scale(rayDir, t));
-
-        int blockX = (int)floor(pos.x);
-        int blockY = (int)floor(pos.y);
-        int blockZ = (int)floor(pos.z);
+        //convert ray to block coords in world space
+        int worldBlockX = (int)floor(pos.x);
+        int worldBlockY = (int)floor(pos.y);
+        int worldBlockZ = (int)floor(pos.z);
+        //figure out which chunk this block is in
+        int chunkX = (int)floor((pos.x + HALF_CHUNK) / CHUNK_SIZE);
+        int chunkY = (int)floor((pos.y + HALF_CHUNK) / CHUNK_SIZE);
+        int chunkZ = (int)floor((pos.z + HALF_CHUNK) / CHUNK_SIZE);
+        // try to get that chunk
+        Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
+        if(!targetChunk) continue; //skip if that chunk doesn't exist yet
+        //convert world coords to chunk-relative coords
+        int blockX = worldBlockX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
+        int blockY = worldBlockY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
+        int blockZ = worldBlockZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
 
         if(blockX >= 0 && blockX < CHUNK_SIZE && 
             blockY >= 0 && blockY < CHUNK_SIZE && 
             blockZ >= 0 && blockZ < CHUNK_SIZE) {
             
-            if(chunk->blocks[blockX][blockY][blockZ].blockType != BLOCK_AIR) {
-                return (Vector3) { blockX, blockY, blockZ };
+            if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
+                return (Vector3) { 
+                    worldBlockX, 
+                    worldBlockY, 
+                    worldBlockZ };
             }
         }
     }
-    return;
+    return (Vector3) {-1000,-1000,-1000}; // return invalid (?) pos if nothing hits
 }
 
 int main(void) {
@@ -65,11 +79,14 @@ int main(void) {
     int cy = (int)floor((camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
     int cz = (int)floor((camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
     Chunk *current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
+    Chunk *chunk_iterator = current_chunk;
 
     UpdateNearbyChunks(cx, cy, cz);
     int prevcx = cx;
     int prevcy = cy;
     int prevcz = cz;
+
+    Vector3 targetBlock = { 0 };
 
     int blocksRendered = 0;
     DisableCursor();
@@ -114,6 +131,7 @@ int main(void) {
         cz = (int)floor((camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
 
         if (prevcx != cx || prevcy != cy || prevcz != cz) {
+            current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
             UpdateNearbyChunks(cx, cy, cz);
             prevcx = cx;
             prevcy = cy;
@@ -127,8 +145,8 @@ int main(void) {
                     nearbyChunkCount = 0;
                 }
                 for (int i = 0; i < nearbyChunkCount; i++) {
-                    current_chunk = get_current_chunk(&chunkTable, nearbyChunks[i].x, nearbyChunks[i].y, nearbyChunks[i].z);
-                    if (!current_chunk) {
+                    chunk_iterator = get_current_chunk(&chunkTable, nearbyChunks[i].x, nearbyChunks[i].y, nearbyChunks[i].z);
+                    if (!chunk_iterator) {
                         continue; //in case get_current_chunk fails, skip this loop
                     }
                     // Vector3 targetBlock = RayCastTargetBlock(&camera, current_chunk);
@@ -144,37 +162,40 @@ int main(void) {
                                 //DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
                                 // need to check to see if block I will draw is even visible (has a neighbor that is block air)
                                 bool isVisible = false;
-                                if (IsBlockAir(current_chunk, x+1, y, z)) isVisible = true;
-                                if (IsBlockAir(current_chunk, x-1, y, z)) isVisible = true;
-                                if (IsBlockAir(current_chunk, x, y+1, z)) isVisible = true;
-                                if (IsBlockAir(current_chunk, x, y-1, z)) isVisible = true;
-                                if (IsBlockAir(current_chunk, x, y, z+1)) isVisible = true;
-                                if (IsBlockAir(current_chunk, x, y, z-1)) isVisible = true;
+                                if (IsBlockAir(chunk_iterator, x+1, y, z)) isVisible = true;
+                                if (IsBlockAir(chunk_iterator, x-1, y, z)) isVisible = true;
+                                if (IsBlockAir(chunk_iterator, x, y+1, z)) isVisible = true;
+                                if (IsBlockAir(chunk_iterator, x, y-1, z)) isVisible = true;
+                                if (IsBlockAir(chunk_iterator, x, y, z+1)) isVisible = true;
+                                if (IsBlockAir(chunk_iterator, x, y, z-1)) isVisible = true;
                                 
 
                                 if (isVisible) {
-                                    if (current_chunk->blocks[x][y][z].blockType == BLOCK_DIRT) {
-                                        //DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
-                                        //DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
-                                        DrawCubeTexture(dirtTex, current_chunk->blocks[x][y][z].pos, 1.0f, 1.0f, 1.0f, WHITE);
+                                    if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_DIRT) {
+                                        //DrawCubeV(chunk_iterator->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                                        //DrawCubeWiresV(chunk_iterator->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                                        DrawCubeTexture(dirtTex, chunk_iterator->blocks[x][y][z].pos, 1.0f, 1.0f, 1.0f, WHITE);
                                         blocksRendered++;
-                                    } else if (current_chunk->blocks[x][y][z].blockType == BLOCK_GRASS) {
-                                        //DrawCubeV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
-                                        //DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
-                                        DrawCubeTexture(grassTex, current_chunk->blocks[x][y][z].pos, 1.0f, 1.0f, 1.0f, WHITE);
+                                    } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_GRASS) {
+                                        //DrawCubeV(chunk_iterator->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
+                                        //DrawCubeWiresV(chunk_iterator->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
+                                        DrawCubeTexture(grassTex, chunk_iterator->blocks[x][y][z].pos, 1.0f, 1.0f, 1.0f, WHITE);
                                         blocksRendered++;
                                     }
                                 }
                             }
                         }
                     }
-                    Vector3 targetBlock = RayCastTargetBlock(&camera, current_chunk);
                     // if (current_chunk->blocks[(int)floor(targetBlock.x)][(int)floor(targetBlock.y)][(int)floor(targetBlock.z)].blockType == BLOCK_AIR) {
                     //     DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
                     // }
-                    DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
+
+
+                    targetBlock = RayCastTargetBlock(&camera, &chunkTable);
+                    DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, PINK);
 
                 }
+
 
             EndMode3D();
 
@@ -187,6 +208,9 @@ int main(void) {
             DrawText(TextFormat("cx:%d cy:%d cz:%d", cx,cy,cz), 450, 20, 20, WHITE);
 
             DrawText(TextFormat("blocks rendered: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
+            DrawText(TextFormat("current_chunk x: %.2f", current_chunk->table_pos.x), 10, 100, 20, LIGHTGRAY);
+            DrawText(TextFormat("target block x: %.2f, target block y: %.2f, target block z: %.2f", targetBlock.x, targetBlock.y, targetBlock.z), 10, 150, 20, LIGHTGRAY);
+
             blocksRendered = 0;
 
 
