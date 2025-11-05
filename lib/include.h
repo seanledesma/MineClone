@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "raylib.h"
 #include "raymath.h"
@@ -14,6 +15,7 @@
 #include "myhash.h"
 #include "chunkmanager.h"
 #include "blockmanager.h"
+#include "player.h"
 
 
 #endif

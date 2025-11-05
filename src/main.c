@@ -8,45 +8,7 @@ void BreakBlock() {
     // }
 }
 
-Vector3 RayCastTargetBlock(Camera* camera, ChunkTable* chunkTable) {
-    float maxDistance = 8.0f;
-    float stepSize = 0.05f; //how fine (?) to step through space, how frequent we are checking if we hit
-    
-    Vector3 rayDir = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
-    Vector3 rayPos = Vector3Add(camera->position, Vector3Scale(rayDir, 0.1f));
 
-    for (float t = 0; t  < maxDistance; t += stepSize) {
-        Vector3 pos = Vector3Add(rayPos, Vector3Scale(rayDir, t));
-        //convert ray to block coords in world space
-        int worldBlockX = (int)floor(pos.x);
-        int worldBlockY = (int)floor(pos.y);
-        int worldBlockZ = (int)floor(pos.z);
-        //figure out which chunk this block is in
-        int chunkX = (int)floor((pos.x + HALF_CHUNK) / CHUNK_SIZE);
-        int chunkY = (int)floor((pos.y + HALF_CHUNK) / CHUNK_SIZE);
-        int chunkZ = (int)floor((pos.z + HALF_CHUNK) / CHUNK_SIZE);
-        // try to get that chunk
-        Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
-        if(!targetChunk) continue; //skip if that chunk doesn't exist yet
-        //convert world coords to chunk-relative coords
-        int blockX = worldBlockX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
-        int blockY = worldBlockY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
-        int blockZ = worldBlockZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
-
-        if(blockX >= 0 && blockX < CHUNK_SIZE && 
-            blockY >= 0 && blockY < CHUNK_SIZE && 
-            blockZ >= 0 && blockZ < CHUNK_SIZE) {
-            
-            if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
-                return (Vector3) { 
-                    worldBlockX, 
-                    worldBlockY, 
-                    worldBlockZ };
-            }
-        }
-    }
-    return (Vector3) {-1000,-1000,-1000}; // return invalid (?) pos if nothing hits
-}
 
 int main(void) {
     const int screenWidth = 1280;
@@ -75,6 +37,9 @@ int main(void) {
 
     int cameraMode = CAMERA_FIRST_PERSON;
 
+    Player player;
+    InitPlayer(&player);
+
     ChunkTable chunkTable;
     memset(&chunkTable, 0, sizeof(ChunkTable));
 
@@ -90,8 +55,6 @@ int main(void) {
     int prevcx = cx;
     int prevcy = cy;
     int prevcz = cz;
-
-    Vector3 targetBlock = { 0 };
 
     int blocksRendered = 0;
     DisableCursor();
@@ -143,10 +106,16 @@ int main(void) {
             prevcy = cy;
             prevcz = cz;
         }
-        targetBlock = RayCastTargetBlock(&camera, &chunkTable);
+        player.targetBlockWorld = RayCastTargetBlock(&camera, &chunkTable);
+        if (player.targetBlockWorld.x != -1000) {
+            player.hasTargetBlock = true;
+        }
+        UpdatePlayerInput(&player, &chunkTable);
         // if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         //     current_chunk->blocks[(int)targetBlock.x][(int)targetBlock.y][(int)targetBlock.z].blockType = BLOCK_AIR;
         // }
+
+        //UpdatePlayerInput(current_chunk, );
         
         BeginDrawing();
             ClearBackground(SKYBLUE);
@@ -202,7 +171,13 @@ int main(void) {
 
 
                     //targetBlock = RayCastTargetBlock(&camera, &chunkTable);
-                    DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, PINK);
+                    DrawCubeWiresV(
+                        (Vector3) { 
+                            player.targetBlockWorld.x + 0.5f, 
+                            player.targetBlockWorld.y + 0.5f, 
+                            player.targetBlockWorld.z + 0.5f }, 
+                        (Vector3) { 1.0f, 1.0f, 1.0f }, 
+                        PINK);
 
                 }
 
@@ -219,7 +194,7 @@ int main(void) {
 
             DrawText(TextFormat("blocks rendered: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
             DrawText(TextFormat("current_chunk x: %.2f", current_chunk->table_pos.x), 10, 100, 20, LIGHTGRAY);
-            DrawText(TextFormat("target block x: %.2f, target block y: %.2f, target block z: %.2f", targetBlock.x, targetBlock.y, targetBlock.z), 10, 150, 20, LIGHTGRAY);
+            DrawText(TextFormat("target block x: %.2f, target block y: %.2f, target block z: %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 10, 150, 20, LIGHTGRAY);
 
             blocksRendered = 0;
 

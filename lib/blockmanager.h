@@ -7,6 +7,8 @@ bool IsBlockAir(Chunk* chunk, int x, int y, int z);
 
 BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int absolute_z);
 
+Vector3 RayCastTargetBlock(Camera* camera, ChunkTable* chunkTable);
+
 void DrawCubeTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color);
 
 #endif

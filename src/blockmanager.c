@@ -36,6 +36,82 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
     }
 }
 
+
+Vector3 RayCastTargetBlock(Camera* camera, ChunkTable* chunkTable) {
+    float maxDistance = 8.0f;
+    float stepSize = 0.05f; //how fine (?) to step through space, how frequent we are checking if we hit
+    
+    Vector3 rayDir = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+    Vector3 rayPos = Vector3Add(camera->position, Vector3Scale(rayDir, 0.1f));
+
+    for (float t = 0; t  < maxDistance; t += stepSize) {
+        Vector3 pos = Vector3Add(rayPos, Vector3Scale(rayDir, t));
+        //convert ray to block coords in world space
+        int worldBlockX = (int)floor(pos.x);
+        int worldBlockY = (int)floor(pos.y);
+        int worldBlockZ = (int)floor(pos.z);
+        //figure out which chunk this block is in
+        int chunkX = (int)floor((pos.x + HALF_CHUNK) / CHUNK_SIZE);
+        int chunkY = (int)floor((pos.y + HALF_CHUNK) / CHUNK_SIZE);
+        int chunkZ = (int)floor((pos.z + HALF_CHUNK) / CHUNK_SIZE);
+        // try to get that chunk
+        Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
+        if(!targetChunk) continue; //skip if that chunk doesn't exist yet
+        //convert world coords to chunk-relative coords
+        int blockX = worldBlockX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
+        int blockY = worldBlockY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
+        int blockZ = worldBlockZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
+
+        if(blockX >= 0 && blockX < CHUNK_SIZE && 
+            blockY >= 0 && blockY < CHUNK_SIZE && 
+            blockZ >= 0 && blockZ < CHUNK_SIZE) {
+            
+            if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
+                return (Vector3) { 
+                    worldBlockX, 
+                    worldBlockY, 
+                    worldBlockZ };
+            }
+        }
+    }
+    return (Vector3) {-1000,-1000,-1000}; // return invalid (?) pos if nothing hits
+}
+
+Vector3 RayCastRelativeTargetBlock(Camera* camera, Chunk* targetChunk) {
+    float maxDistance = 8.0f;
+    float stepSize = 0.05f; //how fine (?) to step through space, how frequent we are checking if we hit
+    
+    Vector3 rayDir = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+    Vector3 rayPos = Vector3Add(camera->position, Vector3Scale(rayDir, 0.1f));
+
+    for (float t = 0; t  < maxDistance; t += stepSize) {
+        Vector3 pos = Vector3Add(rayPos, Vector3Scale(rayDir, t));
+        //convert ray to block coords in world space
+        int worldBlockX = (int)floor(pos.x);
+        int worldBlockY = (int)floor(pos.y);
+        int worldBlockZ = (int)floor(pos.z);
+
+        if(!targetChunk) continue; //skip if that chunk doesn't exist yet
+        //convert world coords to chunk-relative coords
+        int blockX = worldBlockX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
+        int blockY = worldBlockY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
+        int blockZ = worldBlockZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
+
+        if(blockX >= 0 && blockX < CHUNK_SIZE && 
+            blockY >= 0 && blockY < CHUNK_SIZE && 
+            blockZ >= 0 && blockZ < CHUNK_SIZE) {
+            
+            if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
+                return (Vector3) { 
+                    blockX, 
+                    blockY, 
+                    blockZ };
+            }
+        }
+    }
+    return (Vector3) {-1000,-1000,-1000}; // return invalid (?) pos if nothing hits
+}
+
 // yoinked from one of the Raylib examples
 void DrawCubeTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color)
 {

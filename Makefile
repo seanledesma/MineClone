@@ -24,7 +24,8 @@ ASSETS_DIR := assets
 SOURCES := $(SRC_DIR)/main.c \
            $(SRC_DIR)/blockmanager.c \
            $(SRC_DIR)/chunkmanager.c \
-           $(SRC_DIR)/myhash.c
+           $(SRC_DIR)/myhash.c \
+		   $(SRC_DIR)/player.c
 
 # Include directories
 INCLUDES := -I$(SRC_DIR) -I$(LIB_DIR)
