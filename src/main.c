@@ -1,7 +1,12 @@
 #include "include.h"
 
 
+void BreakBlock() {
 
+    // if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    //     targetChunk->blocks[blockX][blockY][blockZ].blockType = BLOCK_AIR;
+    // }
+}
 
 Vector3 RayCastTargetBlock(Camera* camera, ChunkTable* chunkTable) {
     float maxDistance = 8.0f;
@@ -117,6 +122,7 @@ int main(void) {
             GetMouseWheelMove()*2.0f);                              // Move to target (zoom)
 */
 
+
         // // next I want to update the current chunk as the player moves
 
         // I'm going to attempt to generate chunks surrounding the player
@@ -137,6 +143,10 @@ int main(void) {
             prevcy = cy;
             prevcz = cz;
         }
+        targetBlock = RayCastTargetBlock(&camera, &chunkTable);
+        // if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        //     current_chunk->blocks[(int)targetBlock.x][(int)targetBlock.y][(int)targetBlock.z].blockType = BLOCK_AIR;
+        // }
         
         BeginDrawing();
             ClearBackground(SKYBLUE);
@@ -191,7 +201,7 @@ int main(void) {
                     // }
 
 
-                    targetBlock = RayCastTargetBlock(&camera, &chunkTable);
+                    //targetBlock = RayCastTargetBlock(&camera, &chunkTable);
                     DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, PINK);
 
                 }
