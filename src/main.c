@@ -28,12 +28,12 @@ int main(void) {
     SetTextureWrap(stoneTex, TEXTURE_WRAP_CLAMP);
 
     // Define the camera to look into our 3d world (position, target, up vector)
-    Camera camera = { 0 };
-    camera.position = (Vector3){ 0.0f, 2.0f, 5.0f };    // Camera position
-    camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };      // Camera looking at point
-    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
-    camera.fovy = 60.0f;                                // Camera field-of-view Y
-    camera.projection = CAMERA_PERSPECTIVE;             // Camera projection type
+    // Camera camera = { 0 };
+    // camera.position = (Vector3){ 0.0f, 2.0f, 5.0f };    // Camera position
+    // camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };      // Camera looking at point
+    // camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
+    // camera.fovy = 60.0f;                                // Camera field-of-view Y
+    // camera.projection = CAMERA_PERSPECTIVE;             // Camera projection type
 
     int cameraMode = CAMERA_FIRST_PERSON;
 
@@ -45,9 +45,9 @@ int main(void) {
 
 
     // next I want to update the current chunk as the player moves
-    int cx = (int)floor((camera.position.x + HALF_CHUNK) / CHUNK_SIZE);
-    int cy = (int)floor((camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
-    int cz = (int)floor((camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
+    int cx = (int)floor((player.camera.position.x + HALF_CHUNK) / CHUNK_SIZE);
+    int cy = (int)floor((player.camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
+    int cz = (int)floor((player.camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
     Chunk *current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
     Chunk *chunk_iterator = current_chunk;
 
@@ -64,7 +64,7 @@ int main(void) {
         // Update camera computes movement internally depending on the camera mode
         // Some default standard keyboard/mouse inputs are hardcoded to simplify use
         // For advanced camera controls, it's recommended to compute camera movement manually
-        UpdateCamera(&camera, cameraMode);                  // Update camera
+        UpdateCamera(&player.camera, cameraMode);                  // Update camera
 /*
         // Camera PRO usage example (EXPERIMENTAL)
         // This new camera function allows custom movement/rotation values to be directly provided
@@ -95,9 +95,9 @@ int main(void) {
 
         /* I am going to do something different here. I will use cx cy and cz as my integer coords for my hash function, and 
             I will translate those to world coords upon creation */
-        cx = (int)floor((camera.position.x + HALF_CHUNK) / CHUNK_SIZE);
-        cy = (int)floor((camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
-        cz = (int)floor((camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
+        cx = (int)floor((player.camera.position.x + HALF_CHUNK) / CHUNK_SIZE);
+        cy = (int)floor((player.camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
+        cz = (int)floor((player.camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
 
         if (prevcx != cx || prevcy != cy || prevcz != cz) {
             current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
@@ -106,7 +106,7 @@ int main(void) {
             prevcy = cy;
             prevcz = cz;
         }
-        player.targetBlockWorld = RayCastTargetBlock(&camera, &chunkTable);
+        player.targetBlockWorld = RayCastTargetBlock(&player, &chunkTable);
         if (player.targetBlockWorld.x != -1000) {
             player.hasTargetBlock = true;
         }
@@ -119,7 +119,7 @@ int main(void) {
         
         BeginDrawing();
             ClearBackground(SKYBLUE);
-            BeginMode3D(camera);
+            BeginMode3D(player.camera);
                 if (nearbyChunkCount < 0 || nearbyChunkCount > NEARBY_CHUNK_ARRAY_SIZE) {
                     nearbyChunkCount = 0;
                 }
@@ -189,7 +189,7 @@ int main(void) {
             DrawLine(GetScreenWidth() / 2 - 10, GetScreenHeight() / 2, GetScreenWidth() / 2 + 10, GetScreenHeight() / 2, WHITE);
             //DrawText(TextFormat("current chunk coords: x:%d, y:%d, z:%d ", current_chunk->world_pos.x, current_chunk->world_pos.y, current_chunk->world_pos.z), 190, 200, 20, LIGHTGRAY);
             //DrawText(TextFormat("current block coords: x:%d, y:%d, z:%d ", current_chunk->blocks[0]->x, current_chunk->pos.y, current_chunk->pos.z), 190, 200, 20, LIGHTGRAY);
-            DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", camera.position.x, camera.position.y, camera.position.z), 40, 20, 20, LIGHTGRAY);
+            DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", player.camera.position.x, player.camera.position.y, player.camera.position.z), 40, 20, 20, LIGHTGRAY);
             DrawText(TextFormat("cx:%d cy:%d cz:%d", cx,cy,cz), 450, 20, 20, WHITE);
 
             DrawText(TextFormat("blocks rendered: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);

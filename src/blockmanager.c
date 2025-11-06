@@ -37,12 +37,12 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
 }
 
 
-Vector3 RayCastTargetBlock(Camera* camera, ChunkTable* chunkTable) {
+Vector3 RayCastTargetBlock(Player* player, ChunkTable* chunkTable) {
     float maxDistance = 8.0f;
     float stepSize = 0.05f; //how fine (?) to step through space, how frequent we are checking if we hit
     
-    Vector3 rayDir = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
-    Vector3 rayPos = Vector3Add(camera->position, Vector3Scale(rayDir, 0.1f));
+    Vector3 rayDir = Vector3Normalize(Vector3Subtract(player->camera.target, player->camera.position));
+    Vector3 rayPos = Vector3Add(player->camera.position, Vector3Scale(rayDir, 0.1f));
 
     for (float t = 0; t  < maxDistance; t += stepSize) {
         Vector3 pos = Vector3Add(rayPos, Vector3Scale(rayDir, t));
@@ -73,6 +73,7 @@ Vector3 RayCastTargetBlock(Camera* camera, ChunkTable* chunkTable) {
                     worldBlockZ };
             }
         }
+        player->prevTargetBlockPos = pos;
     }
     return (Vector3) {-1000,-1000,-1000}; // return invalid (?) pos if nothing hits
 }

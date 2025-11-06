@@ -6,6 +6,8 @@
 typedef struct Player {
     bool hasTargetBlock;
     Vector3 targetBlockWorld;
+    Vector3 prevTargetBlockPos;
+    Camera camera;
 
 }Player;
 
