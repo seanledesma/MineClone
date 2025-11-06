@@ -60,37 +60,11 @@ int main(void) {
     DisableCursor();
     SetTargetFPS(120);
     while(!WindowShouldClose()) {
+        float dt = GetFrameTime();
 
-        // Update camera computes movement internally depending on the camera mode
-        // Some default standard keyboard/mouse inputs are hardcoded to simplify use
-        // For advanced camera controls, it's recommended to compute camera movement manually
-        UpdateCamera(&player.camera, cameraMode);                  // Update camera
-/*
-        // Camera PRO usage example (EXPERIMENTAL)
-        // This new camera function allows custom movement/rotation values to be directly provided
-        // as input parameters, with this approach, rcamera module is internally independent of raylib inputs
-        UpdateCameraPro(&camera,
-            (Vector3){
-                (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP))*0.1f -      // Move forward-backward
-                (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN))*0.1f,
-                (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT))*0.1f -   // Move right-left
-                (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT))*0.1f,
-                0.0f                                                // Move up-down
-            },
-            (Vector3){
-                GetMouseDelta().x*0.05f,                            // Rotation: yaw
-                GetMouseDelta().y*0.05f,                            // Rotation: pitch
-                0.0f                                                // Rotation: roll
-            },
-            GetMouseWheelMove()*2.0f);                              // Move to target (zoom)
-*/
+        //UpdateCamera(&player.camera, cameraMode);                  // Update camera
+        UpdatePlayer(&player, dt);
 
-
-        // // next I want to update the current chunk as the player moves
-
-        // I'm going to attempt to generate chunks surrounding the player
-        //let's make an array so we don't have to loop this many times to render
-        //((CHUNK_RENDER_MAX * 2) + 1) ^ 3 example: 2 blocks deep, 2 + 2 + og block (1) = 5, 5^3 = 125
 
 
         /* I am going to do something different here. I will use cx cy and cz as my integer coords for my hash function, and 
