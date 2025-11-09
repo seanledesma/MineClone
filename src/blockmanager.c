@@ -36,6 +36,28 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
     }
 }
 
+/*converts world block coords to chunk-relative index*/
+// this is not going to work due to not knowing which chunk the indexs' belong to
+Vector3 ConvWorldCoords(ChunkTable* chunkTable, Vector3 pos) {
+    //convert pos to block coords in world space
+    int worldBlockX = (int)floor(pos.x);
+    int worldBlockY = (int)floor(pos.y);
+    int worldBlockZ = (int)floor(pos.z);
+    //figure out which chunk this block is in
+    int chunkX = (int)floor((pos.x + HALF_CHUNK) / CHUNK_SIZE);
+    int chunkY = (int)floor((pos.y + HALF_CHUNK) / CHUNK_SIZE);
+    int chunkZ = (int)floor((pos.z + HALF_CHUNK) / CHUNK_SIZE);
+    // try to get that chunk
+    Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
+    if(!targetChunk) return (Vector3) {0}; //skip if that chunk doesn't exist yet
+    //convert world coords to chunk-relative coords
+    int blockX = worldBlockX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
+    int blockY = worldBlockY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
+    int blockZ = worldBlockZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
+
+    return (Vector3) {0};
+}
+
 
 Vector3 RayCastTargetBlock(Player* player, ChunkTable* chunkTable) {
     float maxDistance = 8.0f;

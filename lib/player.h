@@ -33,8 +33,10 @@ void UpdatePlayerInput(Player* player, ChunkTable* chunkTable);
 
 void UpdatePlayerCamera(Player* player, float dt);
 
-void UpdatePlayerMovement(Player* player, float dt);
+void UpdatePlayerMovement(ChunkTable* chunkTable, Player* player, float dt);
 
-void UpdatePlayer(Player* player, float dt);
+bool CheckCollisionAtPosition(ChunkTable* chunkTable, Vector3 position, Vector3 size);
+
+void UpdatePlayer(ChunkTable* chunkTable, Player* player, float dt);
 
 #endif

@@ -62,8 +62,7 @@ int main(void) {
     while(!WindowShouldClose()) {
         float dt = GetFrameTime();
 
-        //UpdateCamera(&player.camera, cameraMode);                  // Update camera
-        UpdatePlayer(&player, dt);
+        UpdatePlayer(&chunkTable, &player, dt);
 
 
 
@@ -80,16 +79,6 @@ int main(void) {
             prevcy = cy;
             prevcz = cz;
         }
-        player.targetBlockWorld = RayCastTargetBlock(&player, &chunkTable);
-        if (player.targetBlockWorld.x != -1000) {
-            player.hasTargetBlock = true;
-        }
-        UpdatePlayerInput(&player, &chunkTable);
-        // if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        //     current_chunk->blocks[(int)targetBlock.x][(int)targetBlock.y][(int)targetBlock.z].blockType = BLOCK_AIR;
-        // }
-
-        //UpdatePlayerInput(current_chunk, );
         
         BeginDrawing();
             ClearBackground(SKYBLUE);
@@ -163,12 +152,12 @@ int main(void) {
             DrawLine(GetScreenWidth() / 2 - 10, GetScreenHeight() / 2, GetScreenWidth() / 2 + 10, GetScreenHeight() / 2, WHITE);
             //DrawText(TextFormat("current chunk coords: x:%d, y:%d, z:%d ", current_chunk->world_pos.x, current_chunk->world_pos.y, current_chunk->world_pos.z), 190, 200, 20, LIGHTGRAY);
             //DrawText(TextFormat("current block coords: x:%d, y:%d, z:%d ", current_chunk->blocks[0]->x, current_chunk->pos.y, current_chunk->pos.z), 190, 200, 20, LIGHTGRAY);
-            DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", player.camera.position.x, player.camera.position.y, player.camera.position.z), 40, 20, 20, LIGHTGRAY);
-            DrawText(TextFormat("cx:%d cy:%d cz:%d", cx,cy,cz), 450, 20, 20, WHITE);
+            DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", player.camera.position.x, player.camera.position.y, player.camera.position.z), 100, 8, 20, LIGHTGRAY);
+            //DrawText(TextFormat("cx:%d cy:%d cz:%d", cx,cy,cz), 450, 20, 20, WHITE);
 
-            DrawText(TextFormat("blocks rendered: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
-            DrawText(TextFormat("current_chunk x: %.2f", current_chunk->table_pos.x), 10, 100, 20, LIGHTGRAY);
-            DrawText(TextFormat("target block x: %.2f, target block y: %.2f, target block z: %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 10, 150, 20, LIGHTGRAY);
+            //DrawText(TextFormat("blocks rendered: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
+            //DrawText(TextFormat("current_chunk x: %.2f", current_chunk->table_pos.x), 10, 100, 20, LIGHTGRAY);
+            //DrawText(TextFormat("target block x: %.2f, target block y: %.2f, target block z: %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 10, 150, 20, LIGHTGRAY);
 
             blocksRendered = 0;
 

@@ -19,7 +19,7 @@ void InitPlayer(Player* player) {
     //physics
     player->velocity = (Vector3){ 0.0f, 0.0f, 0.0f };
     player->gravity = -20.0f;  // blocks per second squared
-    player->moveSpeed = 4.3f;  
+    player->moveSpeed = 5.0f;  
     player->sprintMultiplier = 3.3f;
     player->jumpForce = 8.0f;
     player->mouseSensitivity = 0.003f;
@@ -109,7 +109,56 @@ void UpdatePlayerCamera(Player* player, float dt) {
     player->camera.target = Vector3Add(player->camera.position, forward);
 }
 
-void UpdatePlayerMovement(Player* player, float dt) {
+bool CheckCollisionAtPosition(ChunkTable* chunkTable, Vector3 position, Vector3 size) {
+    // lets treat the player as a rectangular prism, check all end points + some mid points
+
+    Vector3 checkPoints[] = {
+        //bottom four corners
+        { position.x - size.x / 2, position.y - size.y, position.z - size.z / 2 },
+        { position.x - size.x / 2, position.y - size.y, position.z + size.z / 2 },
+        { position.x + size.x / 2, position.y - size.y, position.z - size.z / 2 },
+        { position.x + size.x / 2, position.y - size.y, position.z + size.z / 2 },
+        //top four corners
+        { position.x - size.x / 2, position.y, position.z - size.z / 2 },
+        { position.x - size.x / 2, position.y, position.z + size.z / 2 },
+        { position.x + size.x / 2, position.y, position.z - size.z / 2 },
+        { position.x + size.x / 2, position.y, position.z + size.z / 2 },
+        //middle point just in case
+        { position.x, position.y - size.y / 2, position.z },
+    };
+    // now check all check points, lookup world block to chunk index to see if air block or not
+    for (int i = 0; i < 9; i++) {
+        Vector3 point = checkPoints[i];
+
+        //convert to block coords in world space
+        int worldBlockX = (int)floor(point.x);
+        int worldBlockY = (int)floor(point.y);
+        int worldBlockZ = (int)floor(point.z);
+        //figure out which chunk this block is in
+        int chunkX = (int)floor((point.x + HALF_CHUNK) / CHUNK_SIZE);
+        int chunkY = (int)floor((point.y + HALF_CHUNK) / CHUNK_SIZE);
+        int chunkZ = (int)floor((point.z + HALF_CHUNK) / CHUNK_SIZE);
+        // try to get that chunk
+        Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
+        if(!targetChunk) continue; //skip if that chunk doesn't exist yet
+        //convert world coords to chunk-relative coords
+        int blockX = worldBlockX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
+        int blockY = worldBlockY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
+        int blockZ = worldBlockZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
+
+        if(blockX >= 0 && blockX < CHUNK_SIZE && 
+            blockY >= 0 && blockY < CHUNK_SIZE && 
+            blockZ >= 0 && blockZ < CHUNK_SIZE) {
+            
+            if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
+                return true; //collision detected
+            }
+        }
+    }
+    return false;
+}
+
+void UpdatePlayerMovement(ChunkTable* chunkTable, Player* player, float dt) {
     Vector3 forward = Vector3Subtract(player->camera.target, player->camera.position);
     forward.y = 0;
     forward = Vector3Normalize(forward);
@@ -137,26 +186,61 @@ void UpdatePlayerMovement(Player* player, float dt) {
         currentSpeed *= player->sprintMultiplier;
     }
 
-    //apply horizontal movement
-    player->velocity.x = moveInput.x * currentSpeed;
-    player->velocity.z = moveInput.z * currentSpeed;
+    //calculate desired velocity
+    Vector3 desiredVelocity = {
+        moveInput.x * currentSpeed,
+        player->velocity.y,
+        moveInput.z * currentSpeed
+    };
 
     //jump
-    if(IsKeyPressed(KEY_SPACE) && player->isOnGround) {
-        player->velocity.y = player->jumpForce;
+    if(IsKeyDown(KEY_SPACE) && player->isOnGround) {
+        desiredVelocity.y = player->jumpForce;
         player->isOnGround = false;
     }
 
     //gravity
     if(!player->isOnGround) {
-        player->velocity.y += player->gravity * dt;
+        desiredVelocity.y += player->gravity * dt;
     }
 
-    //apply velocity to position
-    player->camera.position.x += player->velocity.x * dt;
-    player->camera.position.y += player->velocity.y * dt;
-    player->camera.position.z += player->velocity.z * dt;
-    
+    /* actual collision detection here */
+    /*
+    * Here is what I'm thinking for a collision system: we only really have two spots to check, the top and the bottom of the player.
+    * Neither should be in any block that is not air. We already know how to get a blocks real world position, so all we need to do
+    * is set some sort of bounds check to make sure the block the player is entering is air, and if not reset the players position just outside. 
+    *
+    */
+    Vector3 newPos = player->camera.position;
+    // try to move on x axis
+    newPos.x += desiredVelocity.x * dt;
+    if (CheckCollisionAtPosition(chunkTable, newPos, player->collisionSize)) {
+        desiredVelocity.x = 0; //stop x movement
+        newPos.x = player->camera.position.x; // reset position to what it was before
+    }
+
+    //now try on y axis
+    newPos.y = player->camera.position.y + desiredVelocity.y * dt;
+    if (CheckCollisionAtPosition(chunkTable, newPos, player->collisionSize)) {
+        if(desiredVelocity.y < 0) {
+            player->isOnGround = true; //hit ground
+        }
+        desiredVelocity.y = 0; 
+        newPos.y = player->camera.position.y; // reset y position
+    } else {
+        player->isOnGround = false; //we're aireborne 
+    }
+
+    //try to move on z axis
+    newPos.z += desiredVelocity.z * dt;
+    if (CheckCollisionAtPosition(chunkTable, newPos, player->collisionSize)) {
+        desiredVelocity.z = 0; //stop x movement
+        newPos.z = player->camera.position.z; // reset position to what it was before
+    }
+
+    player->camera.position = newPos;
+    player->velocity = desiredVelocity;
+
     //update camera target
     Vector3 forward3d = Vector3Subtract(player->camera.target, 
                                         Vector3Subtract(player->camera.position, 
@@ -165,15 +249,15 @@ void UpdatePlayerMovement(Player* player, float dt) {
                                        Vector3Normalize(forward3d));
 }
 
-void UpdatePlayer(Player* player, float dt) {
+void UpdatePlayer(ChunkTable* chunkTable, Player* player, float dt) {
     UpdatePlayerCamera(player, dt);
-    UpdatePlayerMovement(player, dt);
+    UpdatePlayerMovement(chunkTable, player, dt);
 
-    // TODO: Add collision detection here
-    // For now, simple ground check
-    if (player->camera.position.y <= 1.8f) {  // Assuming ground at y=0
-        player->camera.position.y = 1.8f;
-        player->velocity.y = 0;
-        player->isOnGround = true;
+
+    player->targetBlockWorld = RayCastTargetBlock(player, chunkTable);
+    if (player->targetBlockWorld.x != -1000) {
+        player->hasTargetBlock = true;
     }
+
+    UpdatePlayerInput(player, chunkTable);
 }
