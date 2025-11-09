@@ -135,6 +135,75 @@ Vector3 RayCastRelativeTargetBlock(Camera* camera, Chunk* targetChunk) {
     return (Vector3) {-1000,-1000,-1000}; // return invalid (?) pos if nothing hits
 }
 
+void DrawCubeTextureCulled(Texture2D texture, Vector3 position, float width, float height, float length, Color color, uint8_t visibleFaces)
+{
+    float x = position.x;
+    float y = position.y;
+    float z = position.z;
+
+    rlSetTexture(texture.id);
+    rlBegin(RL_QUADS);
+    rlColor4ub(color.r, color.g, color.b, color.a);
+
+    // Front Face (positive Z)
+    if (visibleFaces & FACE_FRONT) {
+        rlNormal3f(0.0f, 0.0f, 1.0f);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z + length/2);
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z + length/2);
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z + length/2);
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z + length/2);
+    }
+
+    // Back Face (negative Z)
+    if (visibleFaces & FACE_BACK) {
+        rlNormal3f(0.0f, 0.0f, -1.0f);
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z - length/2);
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z - length/2);
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z - length/2);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z - length/2);
+    }
+
+    // Top Face (positive Y)
+    if (visibleFaces & FACE_TOP) {
+        rlNormal3f(0.0f, 1.0f, 0.0f);
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z - length/2);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x - width/2, y + height/2, z + length/2);
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x + width/2, y + height/2, z + length/2);
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z - length/2);
+    }
+
+    // Bottom Face (negative Y)
+    if (visibleFaces & FACE_BOTTOM) {
+        rlNormal3f(0.0f, -1.0f, 0.0f);
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x - width/2, y - height/2, z - length/2);
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x + width/2, y - height/2, z - length/2);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z + length/2);
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z + length/2);
+    }
+
+    // Right Face (positive X)
+    if (visibleFaces & FACE_RIGHT) {
+        rlNormal3f(1.0f, 0.0f, 0.0f);
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z - length/2);
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z - length/2);
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z + length/2);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z + length/2);
+    }
+
+    // Left Face (negative X)
+    if (visibleFaces & FACE_LEFT) {
+        rlNormal3f(-1.0f, 0.0f, 0.0f);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z - length/2);
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z + length/2);
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z + length/2);
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z - length/2);
+    }
+
+    rlEnd();
+    rlSetTexture(0);
+}
+
+
 // yoinked from one of the Raylib examples
 void DrawCubeTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color)
 {

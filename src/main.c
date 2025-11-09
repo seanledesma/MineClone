@@ -1,15 +1,5 @@
 #include "include.h"
 
-
-void BreakBlock() {
-
-    // if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-    //     targetChunk->blocks[blockX][blockY][blockZ].blockType = BLOCK_AIR;
-    // }
-}
-
-
-
 int main(void) {
     const int screenWidth = 1920;
     const int screenHeight = 1080;
@@ -91,39 +81,36 @@ int main(void) {
                     if (!chunk_iterator) {
                         continue; //in case get_current_chunk fails, skip this loop
                     }
-                    // Vector3 targetBlock = RayCastTargetBlock(&camera, current_chunk);
-                    // //DrawCubeWiresV(current_chunk->world_pos, (Vector3) { CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE }, BLACK);
-                    // if (current_chunk->blocks[(int)floor(targetBlock.x)][(int)floor(targetBlock.y)][(int)floor(targetBlock.z)].blockType != BLOCK_AIR) {
-                    //     DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
-                    // }
                     
                     for (int x = 0; x < CHUNK_SIZE; x++) {
                         for (int y = 0; y < CHUNK_SIZE; y++) {
                             for (int z = 0; z < CHUNK_SIZE; z++) {
-                                //DrawCubeV(home_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
-                                //DrawCubeWiresV(current_chunk->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
-                                // need to check to see if block I will draw is even visible (has a neighbor that is block air)
-                                bool isVisible = false;
-                                if (IsBlockAir(chunk_iterator, x+1, y, z)) isVisible = true;
-                                if (IsBlockAir(chunk_iterator, x-1, y, z)) isVisible = true;
-                                if (IsBlockAir(chunk_iterator, x, y+1, z)) isVisible = true;
-                                if (IsBlockAir(chunk_iterator, x, y-1, z)) isVisible = true;
-                                if (IsBlockAir(chunk_iterator, x, y, z+1)) isVisible = true;
-                                if (IsBlockAir(chunk_iterator, x, y, z-1)) isVisible = true;
+                                //skip air blocks entirely 
+                                if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_AIR) {
+                                    continue;
+                                }
+                                uint8_t visibleFaces = 0;
+                                if (IsBlockAir(chunk_iterator, x, y, z+1)) visibleFaces |= FACE_FRONT;
+                                if (IsBlockAir(chunk_iterator, x, y, z-1)) visibleFaces |= FACE_BACK;
+                                if (IsBlockAir(chunk_iterator, x, y+1, z)) visibleFaces |= FACE_TOP;
+                                if (IsBlockAir(chunk_iterator, x, y-1, z)) visibleFaces |= FACE_BOTTOM;
+                                if (IsBlockAir(chunk_iterator, x+1, y, z)) visibleFaces |= FACE_RIGHT;
+                                if (IsBlockAir(chunk_iterator, x-1, y, z)) visibleFaces |= FACE_LEFT;
                                 
 
-                                if (isVisible) {
+                                if (visibleFaces > 0) {
+                                    Texture2D texture;
                                     if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_DIRT) {
-                                        //DrawCubeV(chunk_iterator->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
-                                        //DrawCubeWiresV(chunk_iterator->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
-                                        DrawCubeTexture(dirtTex, chunk_iterator->blocks[x][y][z].pos, 1.0f, 1.0f, 1.0f, WHITE);
-                                        blocksRendered++;
+                                        texture = dirtTex;
                                     } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_GRASS) {
-                                        //DrawCubeV(chunk_iterator->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, RAYWHITE);
-                                        //DrawCubeWiresV(chunk_iterator->blocks[x][y][z].pos, (Vector3) { 1.0f, 1.0f, 1.0f }, GRAY);
-                                        DrawCubeTexture(grassTex, chunk_iterator->blocks[x][y][z].pos, 1.0f, 1.0f, 1.0f, WHITE);
-                                        blocksRendered++;
+                                        texture = grassTex;
+                                    } else {
+                                        continue; //unknown block type
                                     }
+                                    
+                                    DrawCubeTextureCulled(texture, chunk_iterator->blocks[x][y][z].pos, 
+                                                        1.0f, 1.0f, 1.0f, WHITE, visibleFaces);
+                                    blocksRendered++;
                                 }
                             }
                         }
@@ -155,7 +142,7 @@ int main(void) {
             DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", player.camera.position.x, player.camera.position.y, player.camera.position.z), 100, 8, 20, LIGHTGRAY);
             //DrawText(TextFormat("cx:%d cy:%d cz:%d", cx,cy,cz), 450, 20, 20, WHITE);
 
-            //DrawText(TextFormat("blocks rendered: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
+            DrawText(TextFormat("blocks rendered: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
             //DrawText(TextFormat("current_chunk x: %.2f", current_chunk->table_pos.x), 10, 100, 20, LIGHTGRAY);
             //DrawText(TextFormat("target block x: %.2f, target block y: %.2f, target block z: %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 10, 150, 20, LIGHTGRAY);
 
