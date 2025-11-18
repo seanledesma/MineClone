@@ -147,6 +147,9 @@ int main(void) {
             //DrawText(TextFormat("current_chunk x: %.2f", current_chunk->table_pos.x), 10, 100, 20, LIGHTGRAY);
             //DrawText(TextFormat("target block x: %.2f, target block y: %.2f, target block z: %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 10, 150, 20, LIGHTGRAY);
 
+            DrawText(TextFormat("target block: %.2f, %.2f, %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 650, 60, 20, LIGHTGRAY);
+            //DrawText(TextFormat("target block type: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
+
             blocksRendered = 0;
 
 
