@@ -22,12 +22,17 @@ bool IsBlockAir(Chunk* chunk, int x, int y, int z) {
 BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int absolute_z) {
     // to shut up pedantic errors
     (void)new_chunk;
-    (void)absolute_x;
-    (void)absolute_z;
+    //(void)absolute_x;
+    //(void)absolute_z;
+    fnl_state noise = fnlCreateState();
+    noise.noise_type = FNL_NOISE_OPENSIMPLEX2;
+    float heightF = fnlGetNoise2D(&noise, absolute_x, absolute_z);
 
-    if (absolute_y == 0) {
+    int height = (int) floor(heightF * 10);
+
+    if (absolute_y == height) {
         return BLOCK_GRASS;
-    }else if (absolute_y < 0) {
+    }else if (absolute_y < height) {
         //new_chunk->blocks[x][y][z].blockType = BLOCK_DIRT;
         return BLOCK_DIRT;
     } else {

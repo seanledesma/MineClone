@@ -1,8 +1,9 @@
+#define FNL_IMPL
 #include "include.h"
 
 int main(void) {
-    const int screenWidth = 1920;
-    const int screenHeight = 1080;
+    const int screenWidth = 1280;
+    const int screenHeight = 720;
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, "raymine v0.0.2");
 

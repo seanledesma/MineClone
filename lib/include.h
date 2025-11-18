@@ -17,5 +17,6 @@
 #include "player.h"
 #include "blockmanager.h"
 
+#include "FastNoiseLite.h"
 
 #endif
