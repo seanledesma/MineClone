@@ -35,8 +35,8 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
     int height = (int) floor(heightF * 5);
 
     if (absolute_y == height) {
-        //return BLOCK_GRASS;
-        return BLOCK_DIRT;
+        return BLOCK_GRASS;
+        //return BLOCK_DIRT;
     }else if (absolute_y < height) {
         //new_chunk->blocks[x][y][z].blockType = BLOCK_DIRT;
         return BLOCK_DIRT;
