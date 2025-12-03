@@ -91,20 +91,22 @@ int main(void) {
                                     continue;
                                 }
                                 uint8_t visibleFaces = 0;
-                                if (IsBlockAir(chunk_iterator, x, y, z+1)) visibleFaces |= FACE_FRONT;
-                                if (IsBlockAir(chunk_iterator, x, y, z-1)) visibleFaces |= FACE_BACK;
-                                if (IsBlockAir(chunk_iterator, x, y+1, z)) visibleFaces |= FACE_TOP;
-                                if (IsBlockAir(chunk_iterator, x, y-1, z)) visibleFaces |= FACE_BOTTOM;
-                                if (IsBlockAir(chunk_iterator, x+1, y, z)) visibleFaces |= FACE_RIGHT;
-                                if (IsBlockAir(chunk_iterator, x-1, y, z)) visibleFaces |= FACE_LEFT;
+                                if (IsBlockAir(&chunkTable, chunk_iterator, x, y, z+1)) visibleFaces |= FACE_FRONT;
+                                if (IsBlockAir(&chunkTable, chunk_iterator, x, y, z-1)) visibleFaces |= FACE_BACK;
+                                if (IsBlockAir(&chunkTable, chunk_iterator, x, y+1, z)) visibleFaces |= FACE_TOP;
+                                if (IsBlockAir(&chunkTable, chunk_iterator, x, y-1, z)) visibleFaces |= FACE_BOTTOM;
+                                if (IsBlockAir(&chunkTable, chunk_iterator, x+1, y, z)) visibleFaces |= FACE_RIGHT;
+                                if (IsBlockAir(&chunkTable, chunk_iterator, x-1, y, z)) visibleFaces |= FACE_LEFT;
                                 
 
                                 if (visibleFaces > 0) {
                                     Texture2D texture;
-                                    if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_DIRT) {
-                                        texture = dirtTex;
-                                    } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_GRASS) {
+                                    if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_GRASS) {
                                         texture = grassTex;
+                                    } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_DIRT) {
+                                        texture = dirtTex;
+                                    } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_STONE) {
+                                        texture = stoneTex;
                                     } else {
                                         continue; //unknown block type
                                     }

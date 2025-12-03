@@ -1,7 +1,7 @@
 #include "include.h"
 
 
-bool IsBlockAir(Chunk* chunk, int x, int y, int z) {
+bool IsBlockAir(ChunkTable* chunkTable, Chunk* chunk, int x, int y, int z) {
     if (!chunk) return true; //treat null chunks as air
     // need to see if block is even in current chunk
     // will need to handle this different when making more chunks visible
@@ -10,12 +10,40 @@ bool IsBlockAir(Chunk* chunk, int x, int y, int z) {
     if (x < 0 || x >= CHUNK_SIZE ||
         y < 0 || y >= CHUNK_SIZE ||
         z < 0 || z >= CHUNK_SIZE) {
-            // I am taking the easy way out, instead of properly checking surrounding chunks, i'll return true
-            // what I mean is checking out of bounds doesn't take into account neighboring chunk block types.
-            return false; //treat everything outside chunk as air? turn true?
-            //return true;
-            //return chunk->blocks[x][y][z].blockType == BLOCK_AIR;
+
+        // I am taking the easy way out, instead of properly checking surrounding chunks, i'll return true
+        // what I mean is checking out of bounds doesn't take into account neighboring chunk block types.
+        //return false; //treat everything outside chunk as air? turn true?
+        //return true;
+        //return chunk->blocks[x][y][z].blockType == BLOCK_AIR;
+        if (x == -1 || x == CHUNK_SIZE  ||
+            y == -1 || y == CHUNK_SIZE  ||
+            z == -1 || z == CHUNK_SIZE ) {
+            /* if the block we want to check is outside this current chunk by just one block,
+            *  then I'll get the world pos, use that to get adjacent block info, then pass that back recursively 
+            */
+            int worldX = chunk->world_pos.x + x;
+            int worldY = chunk->world_pos.y + y;
+            int worldZ = chunk->world_pos.z + z;
+            
+            //figure out which chunk this block is in
+            int chunkX = (int)floor((worldX + HALF_CHUNK) / CHUNK_SIZE);
+            int chunkY = (int)floor((worldY + HALF_CHUNK) / CHUNK_SIZE);
+            int chunkZ = (int)floor((worldZ + HALF_CHUNK) / CHUNK_SIZE);
+            // try to get that chunk
+            Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
+            //if(!targetChunk) return (Vector3) {0}; //skip if that chunk doesn't exist yet
+            //convert world coords to chunk-relative coords
+            int blockX = worldX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
+            int blockY = worldY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
+            int blockZ = worldZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
+
+            return IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ);
+
         }
+        return false;
+
+    }
 
     if (chunk->blocks[x][y][z].blockType == BLOCK_AIR) {
         return true;
@@ -35,11 +63,13 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
     int height = (int) floor(heightF * 5);
 
     if (absolute_y == height) {
-        //return BLOCK_GRASS;
-        return BLOCK_DIRT;
-    }else if (absolute_y < height) {
+        return BLOCK_GRASS;
+        //return BLOCK_DIRT;
+    }else if (absolute_y < height && absolute_y > -20) {
         //new_chunk->blocks[x][y][z].blockType = BLOCK_DIRT;
         return BLOCK_DIRT;
+    }else if (absolute_y <= -20) {
+        return BLOCK_STONE;
     } else {
         //new_chunk->blocks[x][y][z].blockType = BLOCK_AIR;
         return BLOCK_AIR;
@@ -98,7 +128,7 @@ Vector3 RayCastTargetBlock(Player* player, ChunkTable* chunkTable) {
             blockY >= 0 && blockY < CHUNK_SIZE && 
             blockZ >= 0 && blockZ < CHUNK_SIZE) {
             
-            if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
+            if(!IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ)) {
                 return (Vector3) { 
                     worldBlockX, 
                     worldBlockY, 
@@ -134,12 +164,12 @@ Vector3 RayCastRelativeTargetBlock(Camera* camera, Chunk* targetChunk) {
             blockY >= 0 && blockY < CHUNK_SIZE && 
             blockZ >= 0 && blockZ < CHUNK_SIZE) {
             
-            if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
-                return (Vector3) { 
-                    blockX, 
-                    blockY, 
-                    blockZ };
-            }
+            // if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
+            //     return (Vector3) { 
+            //         blockX, 
+            //         blockY, 
+            //         blockZ };
+            // }
         }
     }
     return (Vector3) {-1000,-1000,-1000}; // return invalid (?) pos if nothing hits

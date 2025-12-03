@@ -12,7 +12,7 @@ typedef enum {
     FACE_LEFT   = (1 << 5)   // 0x20
 } FaceFlags;
 
-bool IsBlockAir(Chunk* chunk, int x, int y, int z);
+bool IsBlockAir(ChunkTable* chunkTable, Chunk* chunk, int x, int y, int z);
 
 BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int absolute_z);
 

@@ -47,7 +47,7 @@ void UpdatePlayerInput(Player* player, ChunkTable* chunkTable){
                 blockY >= 0 && blockY < CHUNK_SIZE && 
                 blockZ >= 0 && blockZ < CHUNK_SIZE) {
                 
-                if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
+                if(!IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ)) {
                     targetChunk->blocks[blockX][blockY][blockZ].blockType = BLOCK_AIR;
                 }
             }
@@ -75,7 +75,7 @@ void UpdatePlayerInput(Player* player, ChunkTable* chunkTable){
                 blockY >= 0 && blockY < CHUNK_SIZE && 
                 blockZ >= 0 && blockZ < CHUNK_SIZE) {
                 
-                if(IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
+                if(IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ)) {
                     targetChunk->blocks[blockX][blockY][blockZ].blockType = BLOCK_DIRT;
                 }
             }
@@ -150,7 +150,7 @@ bool CheckCollisionAtPosition(ChunkTable* chunkTable, Vector3 position, Vector3 
             blockY >= 0 && blockY < CHUNK_SIZE && 
             blockZ >= 0 && blockZ < CHUNK_SIZE) {
             
-            if(!IsBlockAir(targetChunk, blockX, blockY, blockZ)) {
+            if(!IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ)) {
                 return true; //collision detected
             }
         }
