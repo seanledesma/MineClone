@@ -11,6 +11,8 @@ bool IsBlockAir(ChunkTable* chunkTable, Chunk* chunk, int x, int y, int z) {
         y < 0 || y >= CHUNK_SIZE ||
         z < 0 || z >= CHUNK_SIZE) {
 
+        return false; // running into memory bugs below, this is temporary
+
         // I am taking the easy way out, instead of properly checking surrounding chunks, i'll return true
         // what I mean is checking out of bounds doesn't take into account neighboring chunk block types.
         //return false; //treat everything outside chunk as air? turn true?
