@@ -16,6 +16,7 @@
 #include "chunkmanager.h"
 #include "player.h"
 #include "blockmanager.h"
+#include "meshmanager.h"
 
 #include "FastNoiseLite.h"
 
