@@ -246,7 +246,7 @@ void FinalizeAndUploadMesh(Mesh* mesh, Model* model, float* temp_verts, float* t
     // 6. Assign the Texture to the Model's Material
     // MAP_ALBEDO is the standard color (diffuse) texture map index.
     // If MAP_ALBEDO is undefined, you can use the integer index 0 instead.
-    model->materials[0].maps[0].texture = texture;
+    model->materials[0].maps[MATERIAL_MAP_ALBEDO].texture = texture;
 }
 
 void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
@@ -258,117 +258,29 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
 
     // max number of possilbe faces (6 faces and 4 possible vertices)
     const int MAX_VERTICES = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 6 * 6;
-    // // allocate memory for arrays to hold mesh data
-    // float* temp_grass_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    // if (temp_grass_vertices == NULL) return;
-    // float* temp_grass_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    // if (temp_grass_normals == NULL) { free(temp_grass_vertices); return; }
-    // float* temp_grass_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    // if (temp_grass_uvs == NULL) { free(temp_grass_vertices); free(temp_grass_normals); return; }
-    // //continue this for other block types
-    // float* temp_dirt_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    // if (temp_dirt_vertices == NULL) return;
-    // float* temp_dirt_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    // if (temp_dirt_normals == NULL) { free(temp_dirt_vertices); return; }
-    // float* temp_dirt_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    // if (temp_dirt_uvs == NULL) { free(temp_dirt_vertices); free(temp_dirt_normals); return; }
-
-    // float* temp_stone_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    // if (temp_stone_vertices == NULL) return;
-    // float* temp_stone_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    // if (temp_stone_normals == NULL) { free(temp_stone_vertices); return; }
-    // float* temp_stone_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    // if (temp_stone_uvs == NULL) { free(temp_stone_vertices); free(temp_stone_normals); return; }
-
-    // --- ALLOCATION PHASE WITH CRITICAL CHECKS ---
-    
-    // 1. Grass Vertices
+    // allocate memory for arrays to hold mesh data
     float* temp_grass_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
     if (temp_grass_vertices == NULL) return;
-    
-    // 2. Grass Normals
     float* temp_grass_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_grass_normals == NULL) { 
-        free(temp_grass_vertices); 
-        return; 
-    }
-    
-    // 3. Grass UVs
+    if (temp_grass_normals == NULL) { free(temp_grass_vertices); return; }
     float* temp_grass_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    if (temp_grass_uvs == NULL) { 
-        free(temp_grass_vertices); 
-        free(temp_grass_normals); 
-        return; 
-    }
-    
-    // 4. Dirt Vertices
+    if (temp_grass_uvs == NULL) { free(temp_grass_vertices); free(temp_grass_normals); return; }
+    //continue this for other block types
     float* temp_dirt_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_dirt_vertices == NULL) { 
-        free(temp_grass_vertices); 
-        free(temp_grass_normals); 
-        free(temp_grass_uvs); 
-        return; 
-    }
-    
-    // 5. Dirt Normals
+    if (temp_dirt_vertices == NULL) return;
     float* temp_dirt_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_dirt_normals == NULL) { 
-        free(temp_grass_vertices); 
-        free(temp_grass_normals); 
-        free(temp_grass_uvs); 
-        free(temp_dirt_vertices); 
-        return; 
-    }
-    
-    // 6. Dirt UVs
+    if (temp_dirt_normals == NULL) { free(temp_dirt_vertices); return; }
     float* temp_dirt_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    if (temp_dirt_uvs == NULL) { 
-        free(temp_grass_vertices); 
-        free(temp_grass_normals); 
-        free(temp_grass_uvs); 
-        free(temp_dirt_vertices); 
-        free(temp_dirt_normals); 
-        return; 
-    }
+    if (temp_dirt_uvs == NULL) { free(temp_dirt_vertices); free(temp_dirt_normals); return; }
 
-    // 7. Stone Vertices
     float* temp_stone_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_stone_vertices == NULL) { 
-        free(temp_grass_vertices); 
-        free(temp_grass_normals); 
-        free(temp_grass_uvs); 
-        free(temp_dirt_vertices); 
-        free(temp_dirt_normals); 
-        free(temp_dirt_uvs);
-        return; 
-    }
-    
-    // 8. Stone Normals
+    if (temp_stone_vertices == NULL) return;
     float* temp_stone_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_stone_normals == NULL) { 
-        free(temp_grass_vertices); 
-        free(temp_grass_normals); 
-        free(temp_grass_uvs); 
-        free(temp_dirt_vertices); 
-        free(temp_dirt_normals); 
-        free(temp_dirt_uvs);
-        free(temp_stone_vertices);
-        return; 
-    }
-    
-    // 9. Stone UVs
+    if (temp_stone_normals == NULL) { free(temp_stone_vertices); return; }
     float* temp_stone_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    if (temp_stone_uvs == NULL) { 
-        free(temp_grass_vertices); 
-        free(temp_grass_normals); 
-        free(temp_grass_uvs); 
-        free(temp_dirt_vertices); 
-        free(temp_dirt_normals); 
-        free(temp_dirt_uvs);
-        free(temp_stone_vertices);
-        free(temp_stone_normals);
-        return; 
-    }
+    if (temp_stone_uvs == NULL) { free(temp_stone_vertices); free(temp_stone_normals); return; }
+
+
 
     // loop through all faces in chunk, if their neighbor is air, proceed to next step
     for (int x = 0; x < CHUNK_SIZE; x++) {

@@ -138,7 +138,7 @@ void create_chunk(ChunkTable* table, int cx, int cy, int cz) {
         baseX++;
     }
 
-    InitChunkMesh(&table, &new_chunk);
+    InitChunkMesh(table, new_chunk);
 
     add_chunk(table, cx, cy, cz, new_chunk);
 
