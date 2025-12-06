@@ -96,6 +96,10 @@ void create_chunk(ChunkTable* table, int cx, int cy, int cz) {
     //         }
     //     }
     // }
+    
+    // !!! CRITICAL FIX 1: Add malloc check AND zero-initialize the chunk
+    if (new_chunk == NULL) return; 
+    memset(new_chunk, 0, sizeof(Chunk)); // <--- THIS IS KEY! Zero-out all members (especially Meshes/Models)
     new_chunk->table_pos = (Vector3) { cx, cy, cz };
     new_chunk->world_pos = (Vector3) { cx * CHUNK_SIZE, cy * CHUNK_SIZE, cz * CHUNK_SIZE };
     /* This is interesting. Cubes in raylib have their origin in the center, so I need to account for that when
@@ -133,6 +137,9 @@ void create_chunk(ChunkTable* table, int cx, int cy, int cz) {
         baseY = -(CHUNK_SIZE / 2) + 0.5f;
         baseX++;
     }
+
+    InitChunkMesh(&table, &new_chunk);
+
     add_chunk(table, cx, cy, cz, new_chunk);
 
     return;

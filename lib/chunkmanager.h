@@ -30,6 +30,13 @@ typedef struct Chunk{
     Vector3 table_pos;
     Vector3 world_pos;
     Block blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+    Mesh grassMesh;
+    Mesh dirtMesh;
+    Mesh stoneMesh;
+
+    Model grassModel;
+    Model dirtModel;
+    Model stoneModel;
 }Chunk;
 
 typedef struct ChunkEntry{

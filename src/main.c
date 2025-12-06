@@ -7,9 +7,9 @@ int main(void) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, "raymine v0.0.2");
 
-    Texture2D grassTex = LoadTexture("assets/grass_full.png");
-    Texture2D dirtTex = LoadTexture("assets/dirt.png");
-    Texture2D stoneTex = LoadTexture("assets/cobblestone.png");
+    grassTex = LoadTexture("assets/grass_full.png");
+    dirtTex = LoadTexture("assets/dirt.png");
+    stoneTex = LoadTexture("assets/cobblestone.png");
 
     SetTextureFilter(grassTex, TEXTURE_FILTER_ANISOTROPIC_16X);
     SetTextureWrap(grassTex, TEXTURE_WRAP_CLAMP);
@@ -82,42 +82,50 @@ int main(void) {
                     if (!chunk_iterator) {
                         continue; //in case get_current_chunk fails, skip this loop
                     }
+
+                    //UploadMesh(&chunk_iterator->grassMesh, false);
+                    //LoadModelFromMesh(chunk_iterator->grassMesh);
+                    DrawModel(chunk_iterator->grassModel, chunk_iterator->world_pos, 1.0f, WHITE);
+                    DrawModel(chunk_iterator->dirtModel, chunk_iterator->world_pos, 1.0f, WHITE);
+                    DrawModel(chunk_iterator->stoneModel, chunk_iterator->world_pos, 1.0f, WHITE);
+
+
                     
-                    for (int x = 0; x < CHUNK_SIZE; x++) {
-                        for (int y = 0; y < CHUNK_SIZE; y++) {
-                            for (int z = 0; z < CHUNK_SIZE; z++) {
-                                //skip air blocks entirely 
-                                if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_AIR) {
-                                    continue;
-                                }
-                                uint8_t visibleFaces = 0;
-                                if (IsBlockAir(&chunkTable, chunk_iterator, x, y, z+1)) visibleFaces |= FACE_FRONT;
-                                if (IsBlockAir(&chunkTable, chunk_iterator, x, y, z-1)) visibleFaces |= FACE_BACK;
-                                if (IsBlockAir(&chunkTable, chunk_iterator, x, y+1, z)) visibleFaces |= FACE_TOP;
-                                if (IsBlockAir(&chunkTable, chunk_iterator, x, y-1, z)) visibleFaces |= FACE_BOTTOM;
-                                if (IsBlockAir(&chunkTable, chunk_iterator, x+1, y, z)) visibleFaces |= FACE_RIGHT;
-                                if (IsBlockAir(&chunkTable, chunk_iterator, x-1, y, z)) visibleFaces |= FACE_LEFT;
+                    // for (int x = 0; x < CHUNK_SIZE; x++) {
+                    //     for (int y = 0; y < CHUNK_SIZE; y++) {
+                    //         for (int z = 0; z < CHUNK_SIZE; z++) {
+                    //             //skip air blocks entirely 
+                    //             if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_AIR) {
+                    //                 continue;
+                    //             }
+                    //             uint8_t visibleFaces = 0;
+                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x, y, z+1)) visibleFaces |= FACE_FRONT;
+                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x, y, z-1)) visibleFaces |= FACE_BACK;
+                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x, y+1, z)) visibleFaces |= FACE_TOP;
+                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x, y-1, z)) visibleFaces |= FACE_BOTTOM;
+                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x+1, y, z)) visibleFaces |= FACE_RIGHT;
+                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x-1, y, z)) visibleFaces |= FACE_LEFT;
                                 
 
-                                if (visibleFaces > 0) {
-                                    Texture2D texture;
-                                    if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_GRASS) {
-                                        texture = grassTex;
-                                    } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_DIRT) {
-                                        texture = dirtTex;
-                                    } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_STONE) {
-                                        texture = stoneTex;
-                                    } else {
-                                        continue; //unknown block type
-                                    }
+                    //             if (visibleFaces > 0) {
+                    //                 Texture2D texture;
+                    //                 if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_GRASS) {
+                    //                     texture = grassTex;
+                    //                 } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_DIRT) {
+                    //                     texture = dirtTex;
+                    //                 } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_STONE) {
+                    //                     texture = stoneTex;
+                    //                 } else {
+                    //                     continue; //unknown block type
+                    //                 }
                                     
-                                    DrawCubeTextureCulled(texture, chunk_iterator->blocks[x][y][z].pos, 
-                                                        1.0f, 1.0f, 1.0f, WHITE, visibleFaces);
-                                    blocksRendered++;
-                                }
-                            }
-                        }
-                    }
+                    //                 DrawCubeTextureCulled(texture, chunk_iterator->blocks[x][y][z].pos, 
+                    //                                     1.0f, 1.0f, 1.0f, WHITE, visibleFaces);
+                    //                 blocksRendered++;
+                    //             }
+                    //         }
+                    //     }
+                    // }
                     // if (current_chunk->blocks[(int)floor(targetBlock.x)][(int)floor(targetBlock.y)][(int)floor(targetBlock.z)].blockType == BLOCK_AIR) {
                     //     DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
                     // }
@@ -161,6 +169,9 @@ int main(void) {
     }
 
     CloseWindow();
+    UnloadTexture(stoneTex);
+    UnloadTexture(dirtTex);
+    UnloadTexture(grassTex);
 
     return 0;       
 }
