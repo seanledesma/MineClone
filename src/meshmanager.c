@@ -83,10 +83,16 @@ const float RIGHT_UVS[] = {
     1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f
 };
 
-// LEFT Face (X- direction)
 const float LEFT_VERTICES[] = {
-    0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 1.0f,  0.0f, 1.0f, 1.0f, // Tri 1: BL, FL, TL
-    0.0f, 0.0f, 0.0f,  0.0f, 1.0f, 1.0f,  0.0f, 1.0f, 0.0f  // Tri 2: BL, TL, TR
+    // Tri 1: BB, TF, TB (CW Order)
+    0.0f, 0.0f, 0.0f,  // V1: BB
+    0.0f, 1.0f, 1.0f,  // V2: TF  <- SWAPPED
+    0.0f, 1.0f, 0.0f,  // V3: TB  <- SWAPPED
+
+    // Tri 2: BB, BF, TF (Your original broken winding)
+    0.0f, 0.0f, 0.0f,  // V4: BB
+    0.0f, 0.0f, 1.0f,  // V5: BF
+    0.0f, 1.0f, 1.0f   // V6: TF
 };
 
 const float LEFT_NORMALS[] = {
@@ -95,10 +101,16 @@ const float LEFT_NORMALS[] = {
 };
 
 const float LEFT_UVS[] = {
-    0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f
-};
+    // Tri 1: V1(BB), V2(TF), V3(TB)
+    0.0f, 1.0f, // V1: BB
+    1.0f, 0.0f, // V2: TF  <- SWAPPED
+    0.0f, 0.0f, // V3: TB  <- SWAPPED
 
+    // Tri 2: V4(BB), V5(BF), V6(TF)
+    0.0f, 1.0f, // V4: BB
+    1.0f, 1.0f, // V5: BF
+    1.0f, 0.0f  // V6: TF
+};
 
 void AddFaceData(float* verts, float* uvs, float* normals, int* vert_count, Vector3 block_pos, int face_id) {
     const float *base_verts;
@@ -300,7 +312,12 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
                 
 
                 if (visibleFaces > 0) {
-                    Vector3 block_pos = { (float)x, (float)y, (float)z };
+                    //Vector3 block_pos = { (float)x, (float)y, (float)z };
+                    Vector3 block_pos = { 
+                        (float)x - HALF_CHUNK, 
+                        (float)y - HALF_CHUNK, 
+                        (float)z - HALF_CHUNK 
+                    };
                     float* current_vertices = NULL;
                     float* current_normals = NULL;
                     float* current_uvs = NULL;
@@ -376,4 +393,64 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
     free(temp_stone_vertices);
     free(temp_stone_normals);
     free(temp_stone_uvs);
+}
+
+void RegenerateChunk(ChunkTable* chunkTable, Chunk* chunk) {
+    if (!chunk) return;
+
+    // free existing models
+    if (chunk->grassModel.meshes != NULL) UnloadModel(chunk->grassModel);
+    if (chunk->dirtModel.meshes != NULL) UnloadModel(chunk->dirtModel);
+    if (chunk->stoneModel.meshes != NULL) UnloadModel(chunk->stoneModel);
+
+    // zero out Models and Meshes
+    memset(&chunk->grassMesh, 0, sizeof(Mesh));
+    memset(&chunk->grassModel, 0, sizeof(Model));
+
+    memset(&chunk->dirtMesh, 0, sizeof(Mesh));
+    memset(&chunk->dirtModel, 0, sizeof(Model));
+
+    memset(&chunk->stoneMesh, 0, sizeof(Mesh));
+    memset(&chunk->stoneModel, 0, sizeof(Model));
+
+    // generate new mesh
+    InitChunkMesh(chunkTable, chunk);
+
+}
+
+void UpdateNeighborChunkMesh(ChunkTable* table, Chunk* currentChunk, int bx, int by, int bz) {
+    int cx = (int)currentChunk->table_pos.x;
+    int cy = (int)currentChunk->table_pos.y;
+    int cz = (int)currentChunk->table_pos.z;
+
+    // If block is at X=0, update the Left Chunk
+    if (bx == 0) {
+        Chunk* neighbor = get_chunk(table, cx - 1, cy, cz);
+        if (neighbor) RegenerateChunk(table, neighbor);
+    }
+    // If block is at X=15, update the Right Chunk
+    else if (bx == CHUNK_SIZE - 1) {
+        Chunk* neighbor = get_chunk(table, cx + 1, cy, cz);
+        if (neighbor) RegenerateChunk(table, neighbor);
+    }
+
+    // Repeat for Y (Top/Bottom)
+    if (by == 0) {
+        Chunk* neighbor = get_chunk(table, cx, cy - 1, cz);
+        if (neighbor) RegenerateChunk(table, neighbor);
+    }
+    else if (by == CHUNK_SIZE - 1) {
+        Chunk* neighbor = get_chunk(table, cx, cy + 1, cz);
+        if (neighbor) RegenerateChunk(table, neighbor);
+    }
+
+    // Repeat for Z (Front/Back)
+    if (bz == 0) {
+        Chunk* neighbor = get_chunk(table, cx, cy, cz - 1);
+        if (neighbor) RegenerateChunk(table, neighbor);
+    }
+    else if (bz == CHUNK_SIZE - 1) {
+        Chunk* neighbor = get_chunk(table, cx, cy, cz + 1);
+        if (neighbor) RegenerateChunk(table, neighbor);
+    }
 }

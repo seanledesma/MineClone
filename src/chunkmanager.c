@@ -101,7 +101,7 @@ void create_chunk(ChunkTable* table, int cx, int cy, int cz) {
     if (new_chunk == NULL) return; 
     memset(new_chunk, 0, sizeof(Chunk)); // <--- THIS IS KEY! Zero-out all members (especially Meshes/Models)
     new_chunk->table_pos = (Vector3) { cx, cy, cz };
-    new_chunk->world_pos = (Vector3) { cx * CHUNK_SIZE, cy * CHUNK_SIZE, cz * CHUNK_SIZE };
+    new_chunk->world_pos = (Vector3) { cx * CHUNK_SIZE, (cy * CHUNK_SIZE), cz * CHUNK_SIZE };
     /* This is interesting. Cubes in raylib have their origin in the center, so I need to account for that when
         placing blocks inside chunks. The first chunk will have the center at (0,0,0), so I need to start at (-8,0,0)
         and end at (8,0,0). But the problem is that those blocks are also drawn from center, so I actually need to 
@@ -126,6 +126,7 @@ void create_chunk(ChunkTable* table, int cx, int cy, int cz) {
                 /* I need to use absolute integer values for deciding block type, esp. for noise sampling in future */
                 int absolute_x = (cx * CHUNK_SIZE) + x - HALF_CHUNK;
                 int absolute_y = (cy * CHUNK_SIZE) + y - (HALF_CHUNK - 1);
+                //int absolute_y = (cy * CHUNK_SIZE) + y - HALF_CHUNK - HALF_CHUNK;
                 int absolute_z = (cz * CHUNK_SIZE) + z - HALF_CHUNK;
                 new_chunk->blocks[x][y][z].blockType = DecideBlockType(new_chunk, absolute_x, absolute_y, absolute_z);
 
@@ -171,4 +172,30 @@ void UpdateNearbyChunks(int cx, int cy, int cz) {
         }
     }
     nearbyChunkCount = tracker;
+}
+
+void CleanupChunkTable(ChunkTable* table) {
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+        ChunkEntry* entry = table->buckets[i];
+        while (entry != NULL) {
+            ChunkEntry* next = entry->next_chunk_entry;
+            
+            // 1. Unload and Free the Mesh/Model data
+            if (entry->chunk) {
+                UnloadMesh(entry->chunk->grassMesh);
+                UnloadMesh(entry->chunk->dirtMesh);
+                UnloadMesh(entry->chunk->stoneMesh);
+                
+                UnloadModel(entry->chunk->grassModel);
+                UnloadModel(entry->chunk->dirtModel);
+                UnloadModel(entry->chunk->stoneModel);
+                
+                free(entry->chunk);
+            }
+            
+            // 2. Free the ChunkEntry struct
+            free(entry);
+            entry = next;
+        }
+    }
 }

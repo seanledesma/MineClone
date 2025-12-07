@@ -49,6 +49,10 @@ void UpdatePlayerInput(Player* player, ChunkTable* chunkTable){
                 
                 if(!IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ)) {
                     targetChunk->blocks[blockX][blockY][blockZ].blockType = BLOCK_AIR;
+
+                    UpdateNeighborChunkMesh(chunkTable, targetChunk, blockX, blockY, blockZ);
+
+                    RegenerateChunk(chunkTable, targetChunk);
                 }
             }
         }
@@ -77,6 +81,10 @@ void UpdatePlayerInput(Player* player, ChunkTable* chunkTable){
                 
                 if(IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ)) {
                     targetChunk->blocks[blockX][blockY][blockZ].blockType = BLOCK_DIRT;
+
+                    UpdateNeighborChunkMesh(chunkTable, targetChunk, blockX, blockY, blockZ);
+
+                    RegenerateChunk(chunkTable, targetChunk);
                 }
             }
         }

@@ -2,10 +2,10 @@
 #include "include.h"
 
 int main(void) {
-    const int screenWidth = 1280;
-    const int screenHeight = 720;
+    const int screenWidth = 1920;
+    const int screenHeight = 1080;
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    InitWindow(screenWidth, screenHeight, "raymine v0.0.2");
+    InitWindow(screenWidth, screenHeight, "raymine v0.1.0");
 
     grassTex = LoadTexture("assets/grass_full.png");
     dirtTex = LoadTexture("assets/dirt.png");
@@ -49,7 +49,7 @@ int main(void) {
 
     int blocksRendered = 0;
     DisableCursor();
-    SetTargetFPS(120);
+    SetTargetFPS(240);
     while(!WindowShouldClose()) {
         float dt = GetFrameTime();
 
@@ -168,10 +168,14 @@ int main(void) {
         EndDrawing();
     }
 
-    CloseWindow();
     UnloadTexture(stoneTex);
     UnloadTexture(dirtTex);
     UnloadTexture(grassTex);
+
+    void CleanupChunkTable(ChunkTable* table);
+
+
+    CloseWindow();
 
     return 0;       
 }

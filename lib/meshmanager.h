@@ -9,6 +9,8 @@ Texture2D stoneTex;
 void AddFaceData(float* verts, float* uvs, float* normals, int* vert_count, Vector3 block_pos, int face_id);
 void FinalizeAndUploadMesh(Mesh* mesh, Model* model, float* temp_verts, float* temp_normals, float* temp_uvs, int vert_count, Texture2D texture);
 void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk);
+void RegenerateChunk(ChunkTable* chunkTable, Chunk* chunk);
+void UpdateNeighborChunkMesh(ChunkTable* table, Chunk* currentChunk, int bx, int by, int bz);
 
 Mesh GenMeshChunk();
 

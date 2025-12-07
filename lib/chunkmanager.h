@@ -57,5 +57,6 @@ void remove_chunk(ChunkTable* table, int cx, int cy, int cz);
 void create_chunk(ChunkTable* table, int cx, int cy, int cz);
 Chunk *get_current_chunk(ChunkTable* table, int cx, int cy, int cz);
 void UpdateNearbyChunks(int cx, int cy, int cz);
+void CleanupChunkTable(ChunkTable* table);
 
 #endif

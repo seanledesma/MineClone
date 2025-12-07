@@ -11,40 +11,24 @@ bool IsBlockAir(ChunkTable* chunkTable, Chunk* chunk, int x, int y, int z) {
         y < 0 || y >= CHUNK_SIZE ||
         z < 0 || z >= CHUNK_SIZE) {
 
-        return false; // running into memory bugs below, this is temporary
+        // fixed this; needed to sub half chunk to get real world coords, whoops 
+        int worldX = chunk->world_pos.x + x - HALF_CHUNK;
+        int worldY = chunk->world_pos.y + y - HALF_CHUNK;
+        int worldZ = chunk->world_pos.z + z - HALF_CHUNK;
 
-        // I am taking the easy way out, instead of properly checking surrounding chunks, i'll return true
-        // what I mean is checking out of bounds doesn't take into account neighboring chunk block types.
-        //return false; //treat everything outside chunk as air? turn true?
-        //return true;
-        //return chunk->blocks[x][y][z].blockType == BLOCK_AIR;
-        if (x == -1 || x == CHUNK_SIZE  ||
-            y == -1 || y == CHUNK_SIZE  ||
-            z == -1 || z == CHUNK_SIZE ) {
-            /* if the block we want to check is outside this current chunk by just one block,
-            *  then I'll get the world pos, use that to get adjacent block info, then pass that back recursively 
-            */
-            int worldX = chunk->world_pos.x + x;
-            int worldY = chunk->world_pos.y + y;
-            int worldZ = chunk->world_pos.z + z;
-            
-            //figure out which chunk this block is in
-            int chunkX = (int)floor((worldX + HALF_CHUNK) / CHUNK_SIZE);
-            int chunkY = (int)floor((worldY + HALF_CHUNK) / CHUNK_SIZE);
-            int chunkZ = (int)floor((worldZ + HALF_CHUNK) / CHUNK_SIZE);
-            // try to get that chunk
-            Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
-            //if(!targetChunk) return (Vector3) {0}; //skip if that chunk doesn't exist yet
-            //convert world coords to chunk-relative coords
-            int blockX = worldX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
-            int blockY = worldY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
-            int blockZ = worldZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
+        int chunkX = (int)floor((worldX + HALF_CHUNK) / (float)CHUNK_SIZE);
+        int chunkY = (int)floor((worldY + HALF_CHUNK) / (float)CHUNK_SIZE);
+        int chunkZ = (int)floor((worldZ + HALF_CHUNK) / (float)CHUNK_SIZE);
 
-            return IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ);
+        Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
 
-        }
-        return false;
+        if (!targetChunk) return true;
 
+        int blockX = worldX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
+        int blockY = worldY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
+        int blockZ = worldZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
+
+        return IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ);
     }
 
     if (chunk->blocks[x][y][z].blockType == BLOCK_AIR) {
