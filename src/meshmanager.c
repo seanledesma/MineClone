@@ -112,7 +112,7 @@ const float LEFT_UVS[] = {
     1.0f, 0.0f  // V6: TF
 };
 
-void AddFaceData(float* verts, float* uvs, float* normals, int* vert_count, Vector3 block_pos, int face_id) {
+void AddFaceData(float* verts, float* uvs, float* normals, unsigned char* colors, int* vert_count, Vector3 block_pos, int face_id, const unsigned char face_colors[24]) {    
     const float *base_verts;
     const float *base_normals;
     const float *base_uvs;
@@ -153,22 +153,25 @@ void AddFaceData(float* verts, float* uvs, float* normals, int* vert_count, Vect
 
     // The number of floats to process (6 vertices * 3 components)
     const int NUM_FLOATS = 6 * 3;
-    const int start_index = *vert_count * 3; // Position in the array to start writing
+    const int NUM_COLOR_BYTES = 6 * 4;
+    const int vert_start_index = *vert_count * 3; 
+    const int color_start_index = *vert_count * 4;
 
     // LOOP 1: Vertices (6 * 3 = 18 floats)
     for (int i = 0; i < NUM_FLOATS; i += 3)
     {
         // Add the block's position (X, Y, Z) to the base vertex coordinates
-        verts[start_index + i]     = base_verts[i] + block_pos.x;     // X + block_pos.x
-        verts[start_index + i + 1] = base_verts[i + 1] + block_pos.y; // Y + block_pos.y
-        verts[start_index + i + 2] = base_verts[i + 2] + block_pos.z; // Z + block_pos.z
+        verts[vert_start_index + i]     = base_verts[i] + block_pos.x;     // X + block_pos.x
+        verts[vert_start_index + i + 1] = base_verts[i + 1] + block_pos.y; // Y + block_pos.y
+        verts[vert_start_index + i + 2] = base_verts[i + 2] + block_pos.z; // Z + block_pos.z
     }
 
     // LOOP 2: Normals and UVs
     // Normals (6 * 3 = 18 floats) and UVs (6 * 2 = 12 floats) are simply copied
     // (A more advanced implementation would transform these for different faces)
-    memcpy(&normals[start_index], base_normals, 6 * 3 * sizeof(float));
+    memcpy(&normals[vert_start_index], base_normals, 6 * 3 * sizeof(float));
     memcpy(&uvs[*vert_count * 2], base_uvs, 6 * 2 * sizeof(float));
+    memcpy(&colors[color_start_index], face_colors, NUM_COLOR_BYTES * sizeof(unsigned char));
 
     // Update the vertex count for the next call
     *vert_count += 6;
@@ -209,11 +212,23 @@ void AddFaceData(float* verts, float* uvs, float* normals, int* vert_count, Vect
 //     model->materials[0].maps[MATERIAL_MAP_ALBEDO].texture = texture;
 // }
 
-void FinalizeAndUploadMesh(Mesh* mesh, Model* model, float* temp_verts, float* temp_normals, float* temp_uvs, int vert_count, Texture2D texture) {
+// Function Signature in meshmanager.h should be updated to:
+// void FinalizeAndUploadMesh(Mesh* mesh, Model* model, float* temp_verts, float* temp_normals, float* temp_uvs, unsigned char* temp_colors, int vert_count, Texture2D texture);
+
+void FinalizeAndUploadMesh(Mesh* mesh, Model* model, 
+                           float* temp_verts, float* temp_normals, float* temp_uvs, 
+                           unsigned char* temp_colors, // <--- NEW ARGUMENT
+                           int vert_count, Texture2D texture) {
+    
     // Handle the case where no faces were generated
     if (vert_count == 0) {
+        // We must still free the temporary arrays passed to this function!
+        free(temp_verts);
+        free(temp_normals);
+        free(temp_uvs);
+        free(temp_colors); // <--- NEW: Free unused temp color buffer
+        
         // Initialize the model structure to prevent crashes when DrawModel() is called on it
-        // Note: raylib initializes the Mesh/Model structures to safe values here.
         *model = LoadModelFromMesh(*mesh); 
         return;
     }
@@ -223,21 +238,29 @@ void FinalizeAndUploadMesh(Mesh* mesh, Model* model, float* temp_verts, float* t
     mesh->triangleCount = vert_count / 3;
 
     // 2. Allocate memory for Raylib's Mesh (MUST be allocated via malloc/calloc)
-    // CRITICAL: Must check for allocation failure (returns NULL)
-
+    
     mesh->vertices = (float *)malloc(vert_count * 3 * sizeof(float));
-    if (mesh->vertices == NULL) return; // Failure, cannot proceed
+    if (mesh->vertices == NULL) return; 
 
     mesh->normals = (float *)malloc(vert_count * 3 * sizeof(float));
     if (mesh->normals == NULL) { 
-        free(mesh->vertices); // Cleanup prior success
+        free(mesh->vertices);
         return;
     }
 
     mesh->texcoords = (float *)malloc(vert_count * 2 * sizeof(float)); 
     if (mesh->texcoords == NULL) { 
-        free(mesh->vertices);  // Cleanup prior successes
+        free(mesh->vertices);
         free(mesh->normals);
+        return;
+    }
+    
+    // NEW: Allocate space for vertex colors (4 components: R, G, B, A)
+    mesh->colors = (unsigned char *)malloc(vert_count * 4 * sizeof(unsigned char));
+    if (mesh->colors == NULL) { 
+        free(mesh->vertices);
+        free(mesh->normals);
+        free(mesh->texcoords);
         return;
     }
 
@@ -245,6 +268,18 @@ void FinalizeAndUploadMesh(Mesh* mesh, Model* model, float* temp_verts, float* t
     memcpy(mesh->vertices, temp_verts, vert_count * 3 * sizeof(float));
     memcpy(mesh->normals, temp_normals, vert_count * 3 * sizeof(float));
     memcpy(mesh->texcoords, temp_uvs, vert_count * 2 * sizeof(float));
+    
+    unsigned char face_colors[24];
+    // NEW: Copy color data
+   //memcpy(mesh->colors, temp_colors, vert_count * 4 * sizeof(unsigned char));
+    unsigned char gray_value = 100;
+    for (int i = 0; i < 24; i += 4) {
+        face_colors[i] = gray_value;       // R
+        face_colors[i+1] = gray_value;     // G
+        face_colors[i+2] = gray_value;     // B
+        face_colors[i+3] = 255;            // A
+    }
+
 
     // 4. Upload to GPU
     UploadMesh(mesh, false);
@@ -252,13 +287,28 @@ void FinalizeAndUploadMesh(Mesh* mesh, Model* model, float* temp_verts, float* t
     // 5. Create the Model
     *model = LoadModelFromMesh(*mesh); 
     
-    // IMPORTANT: Raylib expects the Mesh data (mesh->vertices, etc.) to remain allocated by you
-    // (step 2) after LoadModelFromMesh is called. Do NOT free them here.
-
-    // 6. Assign the Texture to the Model's Material
-    // MAP_ALBEDO is the standard color (diffuse) texture map index.
-    // If MAP_ALBEDO is undefined, you can use the integer index 0 instead.
+    // 6. Assign the Texture
     model->materials[0].maps[MATERIAL_MAP_ALBEDO].texture = texture;
+
+    // NEW FIX: Explicitly set the material's diffuse color to WHITE.
+    // If the vertex color exists, many default shaders will automatically
+    // perform multiplication: FinalColor = VertexColor * TextureColor * MaterialColor.
+    // Setting MaterialColor to WHITE (255,255,255,255) ensures only VertexColor darkens the Texture.
+    model->materials[0].maps[MATERIAL_MAP_ALBEDO].color = WHITE;
+
+    // !!! CRITICAL FIXES (Cleanup of Pointers) !!!
+    // The data was freed by UploadMesh(..., false). Set pointers to NULL
+    // to prevent UnloadMesh from trying to free them again later.
+    mesh->vertices = NULL;
+    mesh->normals = NULL;
+    mesh->texcoords = NULL;
+    mesh->colors = NULL; // <--- NEW: Clear the color pointer too
+
+    // NOTE: Free the temporary buffers passed to this function
+    free(temp_verts);
+    free(temp_normals);
+    free(temp_uvs);
+    free(temp_colors); // <--- NEW: Free the temporary color buffer
 }
 
 void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
@@ -270,28 +320,53 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
 
     // max number of possilbe faces (6 faces and 4 possible vertices)
     const int MAX_VERTICES = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 6 * 6;
-    // allocate memory for arrays to hold mesh data
+    
+    // --- GRASS ALLOCATIONS ---
     float* temp_grass_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
     if (temp_grass_vertices == NULL) return;
     float* temp_grass_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
     if (temp_grass_normals == NULL) { free(temp_grass_vertices); return; }
     float* temp_grass_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
     if (temp_grass_uvs == NULL) { free(temp_grass_vertices); free(temp_grass_normals); return; }
-    //continue this for other block types
+    
+    // NEW: Allocate temporary buffer for vertex colors (4 components: R, G, B, A)
+    unsigned char* temp_grass_colors = (unsigned char *)malloc(MAX_VERTICES * 4 * sizeof(unsigned char));
+    if (temp_grass_colors == NULL) { 
+        free(temp_grass_vertices); free(temp_grass_normals); free(temp_grass_uvs); 
+        return; 
+    }
+
+    // --- DIRT ALLOCATIONS ---
     float* temp_dirt_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_dirt_vertices == NULL) return;
+    if (temp_dirt_vertices == NULL) { free(temp_grass_colors); return; } 
     float* temp_dirt_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_dirt_normals == NULL) { free(temp_dirt_vertices); return; }
+    if (temp_dirt_normals == NULL) { free(temp_dirt_vertices); free(temp_grass_colors); return; }
     float* temp_dirt_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    if (temp_dirt_uvs == NULL) { free(temp_dirt_vertices); free(temp_dirt_normals); return; }
+    if (temp_dirt_uvs == NULL) { free(temp_dirt_vertices); free(temp_dirt_normals); free(temp_grass_colors); return; }
 
+    // NEW: Allocate temporary buffer for dirt colors
+    unsigned char* temp_dirt_colors = (unsigned char *)malloc(MAX_VERTICES * 4 * sizeof(unsigned char));
+    if (temp_dirt_colors == NULL) { 
+        free(temp_dirt_vertices); free(temp_dirt_normals); free(temp_dirt_uvs);
+        free(temp_grass_colors); 
+        return; 
+    }
+
+    // --- STONE ALLOCATIONS ---
     float* temp_stone_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_stone_vertices == NULL) return;
+    if (temp_stone_vertices == NULL) { free(temp_dirt_colors); free(temp_grass_colors); return; } 
     float* temp_stone_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_stone_normals == NULL) { free(temp_stone_vertices); return; }
+    if (temp_stone_normals == NULL) { free(temp_stone_vertices); free(temp_dirt_colors); free(temp_grass_colors); return; }
     float* temp_stone_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    if (temp_stone_uvs == NULL) { free(temp_stone_vertices); free(temp_stone_normals); return; }
+    if (temp_stone_uvs == NULL) { free(temp_stone_vertices); free(temp_stone_normals); free(temp_dirt_colors); free(temp_grass_colors); return; }
 
+    // NEW: Allocate temporary buffer for stone colors
+    unsigned char* temp_stone_colors = (unsigned char *)malloc(MAX_VERTICES * 4 * sizeof(unsigned char));
+    if (temp_stone_colors == NULL) { 
+        free(temp_stone_vertices); free(temp_stone_normals); free(temp_stone_uvs);
+        free(temp_dirt_colors); free(temp_grass_colors);
+        return;
+    }
 
 
     // loop through all faces in chunk, if their neighbor is air, proceed to next step
@@ -312,7 +387,7 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
                 
 
                 if (visibleFaces > 0) {
-                    //Vector3 block_pos = { (float)x, (float)y, (float)z };
+                    
                     Vector3 block_pos = { 
                         (float)x - HALF_CHUNK, 
                         (float)y - HALF_CHUNK, 
@@ -321,25 +396,37 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
                     float* current_vertices = NULL;
                     float* current_normals = NULL;
                     float* current_uvs = NULL;
+                    unsigned char* current_colors = NULL; // NEW: Pointer to the main color buffer
                     int* current_count_ptr = NULL;
 
-                    //Texture2D texture;
+                    // Placeholder for calculated face colors (6 vertices * 4 components = 24 bytes)
+                    unsigned char face_colors[24]; 
+                    
+                    // TODO: Implement the AO calculation here, replacing this simple memset.
+                    // For now, set to solid white (255, 255, 255, 255) to prove the color pipeline works.
+                    memset(face_colors, 255, 24); 
+
+
+                    // --- ASSIGN CURRENT POINTERS ---
                     if (chunk->blocks[x][y][z].blockType == BLOCK_GRASS) {
                         current_vertices = temp_grass_vertices;
                         current_normals = temp_grass_normals;
                         current_uvs = temp_grass_uvs;
+                        current_colors = temp_grass_colors; // NEW: Color pointer
                         current_count_ptr = &grass_vert_count;
 
                     } else if (chunk->blocks[x][y][z].blockType == BLOCK_DIRT) {
                         current_vertices = temp_dirt_vertices;
                         current_normals = temp_dirt_normals;
                         current_uvs = temp_dirt_uvs;
+                        current_colors = temp_dirt_colors; // NEW: Color pointer
                         current_count_ptr = &dirt_vert_count;
 
                     } else if (chunk->blocks[x][y][z].blockType == BLOCK_STONE) {
                         current_vertices = temp_stone_vertices;
                         current_normals = temp_stone_normals;
                         current_uvs = temp_stone_uvs;
+                        current_colors = temp_stone_colors; // NEW: Color pointer
                         current_count_ptr = &stone_vert_count;
 
                     } else {
@@ -348,22 +435,22 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
 
                     // check which faces are visible
                     if (visibleFaces & FACE_FRONT) {
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_count_ptr, block_pos, FACE_FRONT);
+                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_FRONT, face_colors);
                     }
                     if (visibleFaces & FACE_BACK) {
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_count_ptr, block_pos, FACE_BACK);
+                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_BACK, face_colors);
                     }
                     if (visibleFaces & FACE_RIGHT) {
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_count_ptr, block_pos, FACE_RIGHT);
+                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_RIGHT, face_colors);
                     }
                     if (visibleFaces & FACE_LEFT) {
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_count_ptr, block_pos, FACE_LEFT);
+                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_LEFT, face_colors);
                     }
                     if (visibleFaces & FACE_TOP) {
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_count_ptr, block_pos, FACE_TOP);
+                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_TOP, face_colors);
                     }
                     if (visibleFaces & FACE_BOTTOM) {
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_count_ptr, block_pos, FACE_BOTTOM);
+                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_BOTTOM, face_colors);
                     }
                     
                 }
@@ -372,36 +459,37 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
     }
     // Finalize GRASS mesh and model
     FinalizeAndUploadMesh(&chunk->grassMesh, &chunk->grassModel,
-                          temp_grass_vertices, temp_grass_normals, temp_grass_uvs, grass_vert_count, grassTex);
+                          temp_grass_vertices, temp_grass_normals, temp_grass_uvs, temp_grass_colors, grass_vert_count, grassTex); // NEW ARG
 
     // Finalize DIRT mesh and model
     FinalizeAndUploadMesh(&chunk->dirtMesh, &chunk->dirtModel,
-                          temp_dirt_vertices, temp_dirt_normals, temp_dirt_uvs, dirt_vert_count, dirtTex);
+                          temp_dirt_vertices, temp_dirt_normals, temp_dirt_uvs, temp_dirt_colors, dirt_vert_count, dirtTex); // NEW ARG
 
     // Finalize STONE mesh and model
     FinalizeAndUploadMesh(&chunk->stoneMesh, &chunk->stoneModel,
-                          temp_stone_vertices, temp_stone_normals, temp_stone_uvs, stone_vert_count, stoneTex);
+                          temp_stone_vertices, temp_stone_normals, temp_stone_uvs, temp_stone_colors, stone_vert_count, stoneTex); // NEW ARG
 
-    free(temp_grass_vertices);
-    free(temp_grass_normals);
-    free(temp_grass_uvs);
-    
-    free(temp_dirt_vertices);
-    free(temp_dirt_normals);
-    free(temp_dirt_uvs);
 
-    free(temp_stone_vertices);
-    free(temp_stone_normals);
-    free(temp_stone_uvs);
+    // No explicit frees needed here, as they were moved to FinalizeAndUploadMesh
 }
 
 void RegenerateChunk(ChunkTable* chunkTable, Chunk* chunk) {
     if (!chunk) return;
 
-    // free existing models
-    if (chunk->grassModel.meshes != NULL) UnloadModel(chunk->grassModel);
-    if (chunk->dirtModel.meshes != NULL) UnloadModel(chunk->dirtModel);
-    if (chunk->stoneModel.meshes != NULL) UnloadModel(chunk->stoneModel);
+    if (chunk->grassMesh.vaoId != 0) {
+        //UnloadMesh(chunk->grassMesh);
+        UnloadModel(chunk->grassModel); // UnloadModel relies on UnloadMesh success/state
+    }
+    
+    if (chunk->dirtMesh.vaoId != 0) {
+        //UnloadMesh(chunk->dirtMesh);
+        UnloadModel(chunk->dirtModel);
+    }
+    
+    if (chunk->stoneMesh.vaoId != 0) {
+        //UnloadMesh(chunk->stoneMesh);
+        UnloadModel(chunk->stoneModel);
+    }
 
     // zero out Models and Meshes
     memset(&chunk->grassMesh, 0, sizeof(Mesh));
