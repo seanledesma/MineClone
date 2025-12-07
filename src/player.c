@@ -10,7 +10,7 @@ void InitPlayer(Player* player) {
 
     // Define the camera to look into our 3d world (position, target, up vector)
     //player->camera;
-    player->camera.position = (Vector3){ 0.0f, 2.0f, 5.0f };    // Camera position
+    player->camera.position = (Vector3){ 0.0f, 100.0f, 5.0f };    // Camera position
     player->camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };      // Camera looking at point
     player->camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
     player->camera.fovy = 60.0f;                                // Camera field-of-view Y
@@ -210,6 +210,14 @@ void UpdatePlayerMovement(ChunkTable* chunkTable, Player* player, float dt) {
     //gravity
     if(!player->isOnGround) {
         desiredVelocity.y += player->gravity * dt;
+    }
+
+    if(IsKeyDown(KEY_G)) {
+        player->gravity = 1.0f;
+    }
+
+    if(IsKeyDown(KEY_R)) {
+        player->gravity = -20.0f;
     }
 
     /* actual collision detection here */
