@@ -7,6 +7,7 @@ void InitPlayer(Player* player) {
     player->prevTargetBlockPos = (Vector3) { 0 };
     player->isOnGround = false;
     player->isRunning = false;
+    player->isFlying = false;
 
     // Define the camera to look into our 3d world (position, target, up vector)
     //player->camera;
@@ -207,18 +208,39 @@ void UpdatePlayerMovement(ChunkTable* chunkTable, Player* player, float dt) {
         player->isOnGround = false;
     }
 
-    //gravity
-    if(!player->isOnGround) {
-        desiredVelocity.y += player->gravity * dt;
+
+
+    if(IsKeyDown(KEY_F)) {
+        player->isFlying = true;
     }
 
     if(IsKeyDown(KEY_G)) {
-        player->gravity = 1.0f;
+        player->isFlying = false;
     }
 
-    if(IsKeyDown(KEY_R)) {
-        player->gravity = -20.0f;
+    if(IsKeyDown(KEY_SPACE) && player->isFlying) {
+        desiredVelocity.y += 0.1f;
+        //desiredVelocity.y -= player->gravity * dt;
+    } else if (!IsKeyDown(KEY_SPACE) && player->isFlying) {
+        desiredVelocity.y = 0;
     }
+
+    // if(IsKeyDown(KEY_C) && player->isFlying) {
+    //     desiredVelocity.y -= 0.1f;
+    //     //desiredVelocity.y -= player->gravity * dt;
+    // } else if (!IsKeyDown(KEY_C) && player->isFlying) {
+    //     desiredVelocity.y = 0;
+    // }
+
+    //gravity
+    if(!player->isOnGround && !player->isFlying) {
+        desiredVelocity.y += player->gravity * dt;
+    }
+
+
+    
+    
+
 
     /* actual collision detection here */
     /*
@@ -243,6 +265,9 @@ void UpdatePlayerMovement(ChunkTable* chunkTable, Player* player, float dt) {
         }
         desiredVelocity.y = 0; 
         newPos.y = player->camera.position.y; // reset y position
+    } else if (player->isFlying) {
+        //desiredVelocity.y = 0; 
+        //newPos.y = player->camera.position.y; // reset y position
     } else {
         player->isOnGround = false; //we're aireborne 
     }

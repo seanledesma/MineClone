@@ -42,26 +42,41 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
     (void)new_chunk;
     //(void)absolute_x;
     //(void)absolute_z;
-    fnl_state noise = fnlCreateState();
-    //noise.noise_type = FNL_NOISE_OPENSIMPLEX2;
-    noise.noise_type = FNL_NOISE_PERLIN;
-    //noise.fractal_type = FNL_FRACTAL_PINGPONG;
-    noise.frequency = 0.016;
-    float heightF = fnlGetNoise2D(&noise, absolute_x, absolute_z);
 
-    int height = (int) floor(heightF * 30);
+    float noiseVal = fnlGetNoise2D(&GLOBAL_NOISE_2D, absolute_x, absolute_z);
 
-    if (absolute_y == height) {
-        return BLOCK_GRASS;
-        //return BLOCK_DIRT;
-    }else if (absolute_y < height /* && absolute_y > -20 */) {
-        //new_chunk->blocks[x][y][z].blockType = BLOCK_DIRT;
-        return BLOCK_DIRT;
-    }else if (absolute_y <= -200) {
-        return BLOCK_STONE;
-    } else {
-        //new_chunk->blocks[x][y][z].blockType = BLOCK_AIR;
+    float normalizedNoise = (noiseVal + 1.0f) * 0.5f;
+
+    //valleys and peaks
+    float heightCurve = powf(normalizedNoise, 3.0f);
+
+    int groundHeight = (int)(heightCurve * 100.0f) - 40; // -40 so valleys are lower
+
+    // caves
+    bool isCave = false;
+    if (absolute_y < groundHeight) {
+        float caveVal = fnlGetNoise3D(&GLOBAL_NOISE_3D, (float)absolute_x, (float)absolute_y, (float)absolute_z);
+
+        if (caveVal > 0.6f) {
+            isCave = true;
+        }
+    }
+
+
+    if (absolute_y > groundHeight) {
         return BLOCK_AIR;
+    }
+
+    if (isCave) {
+        return BLOCK_AIR;
+    }
+
+    if (absolute_y == groundHeight) {
+        return BLOCK_GRASS;
+    } else if (absolute_y > groundHeight - 4) {
+        return BLOCK_DIRT;
+    }else {
+        return BLOCK_STONE;
     }
 }
 

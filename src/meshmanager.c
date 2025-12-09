@@ -1,5 +1,9 @@
 #include "include.h"
 
+Texture2D grassTex;
+Texture2D dirtTex;
+Texture2D stoneTex;
+
 // FRONT Face (Z+ direction)
 // Vertices (6 vertices * 3 floats = 18 total)
 const float FRONT_VERTICES[] = {

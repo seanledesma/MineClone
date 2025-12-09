@@ -2,8 +2,8 @@
 #include "include.h"
 
 int main(void) {
-    const int screenWidth = 1920;
-    const int screenHeight = 1080;
+    const int screenWidth = 1280;
+    const int screenHeight = 720;
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, "raymine v0.1.0");
 
@@ -18,18 +18,11 @@ int main(void) {
     SetTextureFilter(stoneTex, TEXTURE_FILTER_ANISOTROPIC_16X);
     SetTextureWrap(stoneTex, TEXTURE_WRAP_CLAMP);
 
-    // Define the camera to look into our 3d world (position, target, up vector)
-    // Camera camera = { 0 };
-    // camera.position = (Vector3){ 0.0f, 2.0f, 5.0f };    // Camera position
-    // camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };      // Camera looking at point
-    // camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
-    // camera.fovy = 60.0f;                                // Camera field-of-view Y
-    // camera.projection = CAMERA_PERSPECTIVE;             // Camera projection type
-
-    int cameraMode = CAMERA_FIRST_PERSON;
-
     Player player;
     InitPlayer(&player);
+
+    World world;
+    InitWorld(&world);
 
     ChunkTable chunkTable;
     memset(&chunkTable, 0, sizeof(ChunkTable));

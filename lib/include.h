@@ -11,13 +11,15 @@
 #include "rcamera.h"
 #include "rlgl.h"
 
+#include "FastNoiseLite.h"
 
 #include "myhash.h"
 #include "chunkmanager.h"
 #include "player.h"
 #include "blockmanager.h"
 #include "meshmanager.h"
+#include "world.h"
 
-#include "FastNoiseLite.h"
+
 
 #endif
