@@ -23,7 +23,8 @@ void InitWorld(World* world) {
     GLOBAL_NOISE_3D = fnlCreateState();
     GLOBAL_NOISE_3D.noise_type = FNL_NOISE_OPENSIMPLEX2;
     GLOBAL_NOISE_3D.fractal_type = FNL_FRACTAL_RIDGED;
-    GLOBAL_NOISE_3D.frequency = 0.02f;
-    GLOBAL_NOISE_3D.octaves = 2;
+    //GLOBAL_NOISE_3D.fractal_type = FNL_FRACTAL_FBM;
+    GLOBAL_NOISE_3D.frequency = 0.008f;
+    GLOBAL_NOISE_3D.octaves = 12;
 }
 

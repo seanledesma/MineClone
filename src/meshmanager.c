@@ -4,6 +4,8 @@ Texture2D grassTex;
 Texture2D dirtTex;
 Texture2D stoneTex;
 
+int facesDrawn = 0;
+
 // FRONT Face (Z+ direction)
 // Vertices (6 vertices * 3 floats = 18 total)
 const float FRONT_VERTICES[] = {
@@ -447,6 +449,7 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
                     continue;
                 }
                 uint8_t visibleFaces = 0;
+
                 if (IsBlockAir(chunkTable, chunk, x, y, z+1)) visibleFaces |= FACE_FRONT;
                 if (IsBlockAir(chunkTable, chunk, x, y, z-1)) visibleFaces |= FACE_BACK;
                 if (IsBlockAir(chunkTable, chunk, x, y+1, z)) visibleFaces |= FACE_TOP;
@@ -456,6 +459,7 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
                 
 
                 if (visibleFaces > 0) {
+                    facesDrawn += visibleFaces;
                     
                     Vector3 block_pos = { 
                         (float)x - HALF_CHUNK, 

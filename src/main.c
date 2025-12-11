@@ -40,7 +40,9 @@ int main(void) {
     int prevcy = cy;
     int prevcz = cz;
 
-    int blocksRendered = 0;
+    //int blocksRendered = 0;
+
+
     DisableCursor();
     SetTargetFPS(240);
     while(!WindowShouldClose()) {
@@ -64,6 +66,7 @@ int main(void) {
             prevcz = cz;
         }
         
+        //facesDrawn = 0;
         BeginDrawing();
             ClearBackground(SKYBLUE);
             BeginMode3D(player.camera);
@@ -146,14 +149,14 @@ int main(void) {
             DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", player.camera.position.x, player.camera.position.y, player.camera.position.z), 100, 8, 20, LIGHTGRAY);
             //DrawText(TextFormat("cx:%d cy:%d cz:%d", cx,cy,cz), 450, 20, 20, WHITE);
 
-            DrawText(TextFormat("blocks rendered: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
+            DrawText(TextFormat("faces rendered: %d", facesDrawn), 650, 20, 20, LIGHTGRAY);
             //DrawText(TextFormat("current_chunk x: %.2f", current_chunk->table_pos.x), 10, 100, 20, LIGHTGRAY);
             //DrawText(TextFormat("target block x: %.2f, target block y: %.2f, target block z: %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 10, 150, 20, LIGHTGRAY);
 
             DrawText(TextFormat("target block: %.2f, %.2f, %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 650, 60, 20, LIGHTGRAY);
             //DrawText(TextFormat("target block type: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
 
-            blocksRendered = 0;
+            //blocksRendered = 0;
 
 
 

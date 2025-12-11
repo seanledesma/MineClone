@@ -6,6 +6,8 @@ extern Texture2D grassTex;
 extern Texture2D dirtTex;
 extern Texture2D stoneTex;
 
+extern int facesDrawn;
+
 static int GetAOShade(ChunkTable* table, Chunk* chunk, int x, int y, int z, int dx1, int dy1, int dz1, int dx2, int dy2, int dz2);
 void AddFaceData(float* verts, float* uvs, float* normals, unsigned char* colors, int* vert_count, Vector3 block_pos, int face_id, const unsigned char face_colors[24]);  
 void FinalizeAndUploadMesh(Mesh* mesh, Model* model, 

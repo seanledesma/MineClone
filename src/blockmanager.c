@@ -2,15 +2,15 @@
 
 
 bool IsBlockAir(ChunkTable* chunkTable, Chunk* chunk, int x, int y, int z) {
-    if (!chunk) return true; //treat null chunks as air
-    // need to see if block is even in current chunk
-    // will need to handle this different when making more chunks visible
-    //if (x <)
-    // gonna do some safeguarding to prevent checking outside current chunk
+    if (!chunk) return false; //treat null chunks as NOT air, so we don't draw extra faces
+
+    // if x y or z are outsize current chunk...
     if (x < 0 || x >= CHUNK_SIZE ||
         y < 0 || y >= CHUNK_SIZE ||
         z < 0 || z >= CHUNK_SIZE) {
 
+        //return false;
+        
         // fixed this; needed to sub half chunk to get real world coords, whoops 
         int worldX = chunk->world_pos.x + x - HALF_CHUNK;
         int worldY = chunk->world_pos.y + y - HALF_CHUNK;
@@ -54,12 +54,24 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
 
     // caves
     bool isCave = false;
-    if (absolute_y < groundHeight) {
-        float caveVal = fnlGetNoise3D(&GLOBAL_NOISE_3D, (float)absolute_x, (float)absolute_y, (float)absolute_z);
+    float squash = 0.5;
+    float noise_y = absolute_y / squash;
+    if (absolute_y - 4 < groundHeight) {
+        float caveVal = fnlGetNoise3D(&GLOBAL_NOISE_3D, (float)absolute_x, noise_y, (float)absolute_z);
 
-        if (caveVal > 0.6f) {
+        if (caveVal > 0.7f) {
             isCave = true;
         }
+
+        // Abs(noise) returns values between 0.0 and 1.0. 
+        // 0.0 is the core centerline of the tunnel.
+        //float density = fabsf(caveVal); 
+        
+        // Set a small threshold for the thickness of the tunnel wall.
+        // A low value (e.g., < 0.1) creates thin, winding tubes.
+        // if (density < 0.15f) { 
+        //      return BLOCK_AIR; 
+        // }
     }
 
 
