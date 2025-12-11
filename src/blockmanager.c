@@ -55,7 +55,7 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
     // caves
     bool isCave = false;
     float squash = 0.5;
-    float noise_y = absolute_y / squash;
+    float noise_y = absolute_y * squash;
     if (absolute_y - 4 < groundHeight) {
         float caveVal = fnlGetNoise3D(&GLOBAL_NOISE_3D, (float)absolute_x, noise_y, (float)absolute_z);
 
