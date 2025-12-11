@@ -3,10 +3,10 @@
 
 #include "include.h"
 
-#define CHUNK_SIZE 16
-#define HALF_CHUNK 8
+#define CHUNK_SIZE 64
+#define HALF_CHUNK 32
 #define HASH_TABLE_SIZE 1024
-#define CHUNK_RENDER_MAX 4
+#define CHUNK_RENDER_MAX 1
 
 #define CHUNK_VIEW_DISTANCE (2 * CHUNK_RENDER_MAX + 1)
 #define NEARBY_CHUNK_ARRAY_SIZE (CHUNK_VIEW_DISTANCE * CHUNK_VIEW_DISTANCE * CHUNK_VIEW_DISTANCE)
@@ -30,6 +30,13 @@ typedef struct Chunk{
     Vector3 table_pos;
     Vector3 world_pos;
     Block blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+    Mesh grassMesh;
+    Mesh dirtMesh;
+    Mesh stoneMesh;
+
+    Model grassModel;
+    Model dirtModel;
+    Model stoneModel;
 }Chunk;
 
 typedef struct ChunkEntry{
@@ -50,5 +57,6 @@ void remove_chunk(ChunkTable* table, int cx, int cy, int cz);
 void create_chunk(ChunkTable* table, int cx, int cy, int cz);
 Chunk *get_current_chunk(ChunkTable* table, int cx, int cy, int cz);
 void UpdateNearbyChunks(int cx, int cy, int cz);
+void CleanupChunkTable(ChunkTable* table);
 
 #endif

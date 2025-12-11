@@ -2,49 +2,33 @@
 
 
 bool IsBlockAir(ChunkTable* chunkTable, Chunk* chunk, int x, int y, int z) {
-    if (!chunk) return true; //treat null chunks as air
-    // need to see if block is even in current chunk
-    // will need to handle this different when making more chunks visible
-    //if (x <)
-    // gonna do some safeguarding to prevent checking outside current chunk
+    if (!chunk) return false; //treat null chunks as NOT air, so we don't draw extra faces
+
+    // if x y or z are outsize current chunk...
     if (x < 0 || x >= CHUNK_SIZE ||
         y < 0 || y >= CHUNK_SIZE ||
         z < 0 || z >= CHUNK_SIZE) {
 
-        return false; // running into memory bugs below, this is temporary
+        //return false;
+        
+        // fixed this; needed to sub half chunk to get real world coords, whoops 
+        int worldX = chunk->world_pos.x + x - HALF_CHUNK;
+        int worldY = chunk->world_pos.y + y - HALF_CHUNK;
+        int worldZ = chunk->world_pos.z + z - HALF_CHUNK;
 
-        // I am taking the easy way out, instead of properly checking surrounding chunks, i'll return true
-        // what I mean is checking out of bounds doesn't take into account neighboring chunk block types.
-        //return false; //treat everything outside chunk as air? turn true?
-        //return true;
-        //return chunk->blocks[x][y][z].blockType == BLOCK_AIR;
-        if (x == -1 || x == CHUNK_SIZE  ||
-            y == -1 || y == CHUNK_SIZE  ||
-            z == -1 || z == CHUNK_SIZE ) {
-            /* if the block we want to check is outside this current chunk by just one block,
-            *  then I'll get the world pos, use that to get adjacent block info, then pass that back recursively 
-            */
-            int worldX = chunk->world_pos.x + x;
-            int worldY = chunk->world_pos.y + y;
-            int worldZ = chunk->world_pos.z + z;
-            
-            //figure out which chunk this block is in
-            int chunkX = (int)floor((worldX + HALF_CHUNK) / CHUNK_SIZE);
-            int chunkY = (int)floor((worldY + HALF_CHUNK) / CHUNK_SIZE);
-            int chunkZ = (int)floor((worldZ + HALF_CHUNK) / CHUNK_SIZE);
-            // try to get that chunk
-            Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
-            //if(!targetChunk) return (Vector3) {0}; //skip if that chunk doesn't exist yet
-            //convert world coords to chunk-relative coords
-            int blockX = worldX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
-            int blockY = worldY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
-            int blockZ = worldZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
+        int chunkX = (int)floor((worldX + HALF_CHUNK) / (float)CHUNK_SIZE);
+        int chunkY = (int)floor((worldY + HALF_CHUNK) / (float)CHUNK_SIZE);
+        int chunkZ = (int)floor((worldZ + HALF_CHUNK) / (float)CHUNK_SIZE);
 
-            return IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ);
+        Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
 
-        }
-        return false;
+        if (!targetChunk) return true;
 
+        int blockX = worldX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
+        int blockY = worldY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
+        int blockZ = worldZ - (int)floor(targetChunk->world_pos.z) + HALF_CHUNK;
+
+        return IsBlockAir(chunkTable, targetChunk, blockX, blockY, blockZ);
     }
 
     if (chunk->blocks[x][y][z].blockType == BLOCK_AIR) {
@@ -58,23 +42,53 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
     (void)new_chunk;
     //(void)absolute_x;
     //(void)absolute_z;
-    fnl_state noise = fnlCreateState();
-    noise.noise_type = FNL_NOISE_OPENSIMPLEX2;
-    float heightF = fnlGetNoise2D(&noise, absolute_x, absolute_z);
 
-    int height = (int) floor(heightF * 5);
+    float noiseVal = fnlGetNoise2D(&GLOBAL_NOISE_2D, absolute_x, absolute_z);
 
-    if (absolute_y == height) {
-        return BLOCK_GRASS;
-        //return BLOCK_DIRT;
-    }else if (absolute_y < height && absolute_y > -20) {
-        //new_chunk->blocks[x][y][z].blockType = BLOCK_DIRT;
-        return BLOCK_DIRT;
-    }else if (absolute_y <= -20) {
-        return BLOCK_STONE;
-    } else {
-        //new_chunk->blocks[x][y][z].blockType = BLOCK_AIR;
+    float normalizedNoise = (noiseVal + 1.0f) * 0.5f;
+
+    //valleys and peaks
+    float heightCurve = powf(normalizedNoise, 3.0f);
+
+    int groundHeight = (int)(heightCurve * 100.0f) - 40; // -40 so valleys are lower
+
+    // caves
+    bool isCave = false;
+    float squash = 0.5;
+    float noise_y = absolute_y * squash;
+    if (absolute_y - 4 < groundHeight) {
+        float caveVal = fnlGetNoise3D(&GLOBAL_NOISE_3D, (float)absolute_x, noise_y, (float)absolute_z);
+
+        if (caveVal > 0.7f) {
+            isCave = true;
+        }
+
+        // Abs(noise) returns values between 0.0 and 1.0. 
+        // 0.0 is the core centerline of the tunnel.
+        //float density = fabsf(caveVal); 
+        
+        // Set a small threshold for the thickness of the tunnel wall.
+        // A low value (e.g., < 0.1) creates thin, winding tubes.
+        // if (density < 0.15f) { 
+        //      return BLOCK_AIR; 
+        // }
+    }
+
+
+    if (absolute_y > groundHeight) {
         return BLOCK_AIR;
+    }
+
+    if (isCave) {
+        return BLOCK_AIR;
+    }
+
+    if (absolute_y == groundHeight) {
+        return BLOCK_GRASS;
+    } else if (absolute_y > groundHeight - 4) {
+        return BLOCK_DIRT;
+    }else {
+        return BLOCK_STONE;
     }
 }
 

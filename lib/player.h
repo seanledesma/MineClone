@@ -10,6 +10,7 @@ typedef struct Player {
     //state
     bool isRunning;
     bool isOnGround;
+    bool isFlying;
     bool hasTargetBlock;
     Vector3 targetBlockWorld;
     Vector3 prevTargetBlockPos;
