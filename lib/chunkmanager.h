@@ -11,8 +11,17 @@
 #define CHUNK_VIEW_DISTANCE (2 * CHUNK_RENDER_MAX + 1)
 #define NEARBY_CHUNK_ARRAY_SIZE (CHUNK_VIEW_DISTANCE * CHUNK_VIEW_DISTANCE * CHUNK_VIEW_DISTANCE)
 
+// NEW: Chunk States
+#define CHUNK_STATE_EMPTY          0
+#define CHUNK_STATE_REQUESTED      1 // Job is in the queue
+#define CHUNK_STATE_BLOCKS_READY   2 // Block data generated, worker has meshed, result is in results_queue
+#define CHUNK_STATE_READY          3 // Mesh uploaded to GPU, safe to draw
+
 extern Vector3 nearbyChunks [NEARBY_CHUNK_ARRAY_SIZE]; 
 extern int nearbyChunkCount;
+
+typedef struct Job Job;
+typedef struct JobResult JobResult;
 
 typedef enum BlockType {
     BLOCK_AIR,
@@ -37,6 +46,8 @@ typedef struct Chunk{
     Model grassModel;
     Model dirtModel;
     Model stoneModel;
+
+    int state;
 }Chunk;
 
 typedef struct ChunkEntry{
@@ -52,11 +63,16 @@ typedef struct {
 
 size_t hash_index(uint64_t key);
 void add_chunk(ChunkTable* table, int cx, int cy, int cz, Chunk* chunk);
+
 Chunk *get_chunk(ChunkTable* table, int cx, int cy, int cz);
 void remove_chunk(ChunkTable* table, int cx, int cy, int cz);
-void create_chunk(ChunkTable* table, int cx, int cy, int cz);
+//void create_chunk(ChunkTable* table, int cx, int cy, int cz);
+Chunk* create_chunk(Job* job);
 Chunk *get_current_chunk(ChunkTable* table, int cx, int cy, int cz);
 void UpdateNearbyChunks(int cx, int cy, int cz);
 void CleanupChunkTable(ChunkTable* table);
+void ProcessChunkResults();
+void ProcessJobResults(ChunkTable* table);
+
 
 #endif

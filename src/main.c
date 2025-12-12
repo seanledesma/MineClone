@@ -27,11 +27,46 @@ int main(void) {
     ChunkTable chunkTable;
     memset(&chunkTable, 0, sizeof(ChunkTable));
 
+    //initialize mutex lock for jobs list
+    mtx_init(&queue_mutex, mtx_plain);
+    cnd_init(&job_available);
+
+    // NEW: Initialize results queue primitives
+    mtx_init(&result_mutex, mtx_plain);
+    cnd_init(&result_ready);
+
+    // NEW: Initialize chunk table mutex
+    mtx_init(&chunk_table_mutex, mtx_plain);
+
+    const int NUM_WORKERS = 4;
+    thrd_t worker_threads[NUM_WORKERS];
+    for (int i = 0; i < NUM_WORKERS; i++) {
+        thrd_create(&worker_threads[i], chunk_generator_worker, NULL);
+    }
+    // for (int i = 0; i < NUM_WORKERS; i++) {
+    //     // thrd_create does the following:
+    //     // a) Allocates resources for a new thread.
+    //     // b) Makes this new thread begin execution at the 'chunk_generator_worker' function.
+    //     // c) Passes 'NULL' as the argument (which is the void* arg in the worker function).
+    //     int result = thrd_create(
+    //         &worker_threads[i],          // The thrd_t handle to store the new thread's ID
+    //         chunk_generator_worker,      // The function the new thread will execute (the job loop)
+    //         NULL                         // The argument to pass to the function (void* arg)
+    //     );
+
+    //     if (result != thrd_success) {
+    //         // Handle error: Not enough resources to create a thread
+    //         // raylib: 
+    //         TraceLog(LOG_ERROR, "Failed to create worker thread %d", i);
+    //     }
+    // }
 
     // next I want to update the current chunk as the player moves
     int cx = (int)floor((player.camera.position.x + HALF_CHUNK) / CHUNK_SIZE);
     int cy = (int)floor((player.camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
     int cz = (int)floor((player.camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
+
+
     Chunk *current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
     Chunk *chunk_iterator = current_chunk;
 
@@ -65,6 +100,11 @@ int main(void) {
             prevcy = cy;
             prevcz = cz;
         }
+
+
+        // NEW: Process any completed chunk meshes before drawing the frame
+        ProcessChunkResults();
+        ProcessJobResults(&chunkTable);
         
         //facesDrawn = 0;
         BeginDrawing();
@@ -74,57 +114,21 @@ int main(void) {
                     nearbyChunkCount = 0;
                 }
                 for (int i = 0; i < nearbyChunkCount; i++) {
-                    chunk_iterator = get_current_chunk(&chunkTable, nearbyChunks[i].x, nearbyChunks[i].y, nearbyChunks[i].z);
-                    if (!chunk_iterator) {
-                        continue; //in case get_current_chunk fails, skip this loop
-                    }
-
-                    //UploadMesh(&chunk_iterator->grassMesh, false);
-                    //LoadModelFromMesh(chunk_iterator->grassMesh);
-                    DrawModel(chunk_iterator->grassModel, chunk_iterator->world_pos, 1.0f, WHITE);
-                    DrawModel(chunk_iterator->dirtModel, chunk_iterator->world_pos, 1.0f, WHITE);
-                    DrawModel(chunk_iterator->stoneModel, chunk_iterator->world_pos, 1.0f, WHITE);
-
-
+                    Chunk* chunk = get_chunk(&chunkTable, cx, cy, cz);
                     
-                    // for (int x = 0; x < CHUNK_SIZE; x++) {
-                    //     for (int y = 0; y < CHUNK_SIZE; y++) {
-                    //         for (int z = 0; z < CHUNK_SIZE; z++) {
-                    //             //skip air blocks entirely 
-                    //             if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_AIR) {
-                    //                 continue;
-                    //             }
-                    //             uint8_t visibleFaces = 0;
-                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x, y, z+1)) visibleFaces |= FACE_FRONT;
-                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x, y, z-1)) visibleFaces |= FACE_BACK;
-                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x, y+1, z)) visibleFaces |= FACE_TOP;
-                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x, y-1, z)) visibleFaces |= FACE_BOTTOM;
-                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x+1, y, z)) visibleFaces |= FACE_RIGHT;
-                    //             if (IsBlockAir(&chunkTable, chunk_iterator, x-1, y, z)) visibleFaces |= FACE_LEFT;
-                                
-
-                    //             if (visibleFaces > 0) {
-                    //                 Texture2D texture;
-                    //                 if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_GRASS) {
-                    //                     texture = grassTex;
-                    //                 } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_DIRT) {
-                    //                     texture = dirtTex;
-                    //                 } else if (chunk_iterator->blocks[x][y][z].blockType == BLOCK_STONE) {
-                    //                     texture = stoneTex;
-                    //                 } else {
-                    //                     continue; //unknown block type
-                    //                 }
-                                    
-                    //                 DrawCubeTextureCulled(texture, chunk_iterator->blocks[x][y][z].pos, 
-                    //                                     1.0f, 1.0f, 1.0f, WHITE, visibleFaces);
-                    //                 blocksRendered++;
-                    //             }
-                    //         }
-                    //     }
-                    // }
-                    // if (current_chunk->blocks[(int)floor(targetBlock.x)][(int)floor(targetBlock.y)][(int)floor(targetBlock.z)].blockType == BLOCK_AIR) {
-                    //     DrawCubeWiresV((Vector3) { targetBlock.x + 0.5f, targetBlock.y + 0.5f, targetBlock.z + 0.5f}, (Vector3) { 1.0f, 1.0f, 1.0f }, BLACK);
-                    // }
+                    if (chunk == NULL) {
+                        // If it's a new location, create the job and request it
+                        Job* job = create_job(&chunkTable, cx, cy, cz);
+                        if (job) {
+                            job_push(job);
+                            cnd_signal(&job_available); // Wake up a worker!
+                        }
+                    } else if (chunk->state == CHUNK_STATE_READY) {
+                        // Draw the chunk only if its mesh has been uploaded
+                        DrawModel(chunk->grassModel, chunk->world_pos, 1.0f, WHITE);
+                        DrawModel(chunk->dirtModel, chunk->world_pos, 1.0f, WHITE);
+                        DrawModel(chunk->stoneModel, chunk->world_pos, 1.0f, WHITE);
+                    }
 
 
                     //targetBlock = RayCastTargetBlock(&camera, &chunkTable);
@@ -163,6 +167,17 @@ int main(void) {
             DrawFPS(10, 10);
         EndDrawing();
     }
+
+    //need to close threads
+    RUNNING = false;
+    cnd_broadcast(&job_available); //wake up all threads, to close them
+    for (int i = 0; i < NUM_WORKERS; i++) {
+        thrd_join(worker_threads[i], NULL);//block main thread until workers finish
+    }
+    mtx_destroy(&queue_mutex);
+    cnd_destroy(&job_available);
+    mtx_destroy(&result_mutex);
+    cnd_destroy(&result_ready);
 
     UnloadTexture(stoneTex);
     UnloadTexture(dirtTex);

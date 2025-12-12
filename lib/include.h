@@ -12,6 +12,7 @@
 #include "rlgl.h"
 
 #include "FastNoiseLite.h"
+#include "tinycthread.h"
 
 #include "myhash.h"
 #include "chunkmanager.h"
@@ -19,6 +20,7 @@
 #include "blockmanager.h"
 #include "meshmanager.h"
 #include "world.h"
+#include "workers.h"
 
 
 

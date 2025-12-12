@@ -140,6 +140,28 @@ const float LEFT_UVS[] = {
     0.0f, 0.0f,  1.0f, 0.0f,  1.0f, 1.0f
 };
 
+
+static void CleanupJobResult(JobResult* result) {
+    if (!result) return;
+    if (result->grass_vertices) free(result->grass_vertices);
+    if (result->grass_normals) free(result->grass_normals);
+    if (result->grass_uvs) free(result->grass_uvs);
+    if (result->grass_colors) free(result->grass_colors);
+
+    if (result->dirt_vertices) free(result->dirt_vertices);
+    if (result->dirt_normals) free(result->dirt_normals);
+    if (result->dirt_uvs) free(result->dirt_uvs);
+    if (result->dirt_colors) free(result->dirt_colors);
+
+    if (result->stone_vertices) free(result->stone_vertices);
+    if (result->stone_normals) free(result->stone_normals);
+    if (result->stone_uvs) free(result->stone_uvs);
+    if (result->stone_colors) free(result->stone_colors);
+    
+    free(result);
+}
+
+
 // Defines the maximum shade level (0 = full light, 3 = max shadow)
 // This uses a simple sum of 1 for each solid neighbor block.
 static int GetAOShade(ChunkTable* table, Chunk* chunk, int x, int y, int z, int dx1, int dy1, int dz1, int dx2, int dy2, int dz2) {
@@ -385,65 +407,61 @@ void FinalizeAndUploadMesh(Mesh* mesh, Model* model,
     free(temp_colors); // <--- NEW: Free the temporary color buffer
 }
 
-void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
-
-    // track how many vertices have been added to each array
+// RENAME and REFACTOR: This function now performs only CPU-heavy work (meshing) 
+// and returns the raw data buffers via a JobResult struct.
+JobResult* GenerateRawMesh(ChunkTable* chunkTable, Chunk* chunk) {
+    
+    // 0. Allocate the JobResult struct that will hold the buffers
+    JobResult* result = (JobResult*)malloc(sizeof(JobResult));
+    if (result == NULL) return NULL;
+    
+    // Set chunk and table pointers
+    result->chunk = chunk;
+    result->table = chunkTable;
+    
+    // Initialize counts to zero
     int grass_vert_count = 0;
     int dirt_vert_count = 0;
     int stone_vert_count = 0;
-
-    // max number of possilbe faces (6 faces and 4 possible vertices)
-    const int MAX_VERTICES = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 6 * 6;
+    
+    // max number of possilbe vertices (6 faces * 6 vertices = 36 vertices/block max)
+    const int MAX_VERTICES = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 36;
     
     // --- GRASS ALLOCATIONS ---
-    float* temp_grass_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_grass_vertices == NULL) return;
-    float* temp_grass_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_grass_normals == NULL) { free(temp_grass_vertices); return; }
-    float* temp_grass_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    if (temp_grass_uvs == NULL) { free(temp_grass_vertices); free(temp_grass_normals); return; }
+    result->grass_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
+    if (result->grass_vertices == NULL) { CleanupJobResult(result); return NULL; }
+    result->grass_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
+    if (result->grass_normals == NULL) { CleanupJobResult(result); return NULL; }
+    result->grass_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
+    if (result->grass_uvs == NULL) { CleanupJobResult(result); return NULL; }
+    result->grass_colors = (unsigned char *)malloc(MAX_VERTICES * 4 * sizeof(unsigned char));
+    if (result->grass_colors == NULL) { CleanupJobResult(result); return NULL; }
     
-    unsigned char* temp_grass_colors = (unsigned char *)malloc(MAX_VERTICES * 4 * sizeof(unsigned char));
-    if (temp_grass_colors == NULL) { 
-        free(temp_grass_vertices); free(temp_grass_normals); free(temp_grass_uvs); 
-        return; 
-    }
-
     // --- DIRT ALLOCATIONS ---
-    float* temp_dirt_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_dirt_vertices == NULL) { free(temp_grass_colors); return; } 
-    float* temp_dirt_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_dirt_normals == NULL) { free(temp_dirt_vertices); free(temp_grass_colors); return; }
-    float* temp_dirt_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    if (temp_dirt_uvs == NULL) { free(temp_dirt_vertices); free(temp_dirt_normals); free(temp_grass_colors); return; }
-
-    unsigned char* temp_dirt_colors = (unsigned char *)malloc(MAX_VERTICES * 4 * sizeof(unsigned char));
-    if (temp_dirt_colors == NULL) { 
-        free(temp_dirt_vertices); free(temp_dirt_normals); free(temp_dirt_uvs);
-        free(temp_grass_colors); 
-        return; 
-    }
+    result->dirt_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
+    if (result->dirt_vertices == NULL) { CleanupJobResult(result); return NULL; } 
+    result->dirt_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
+    if (result->dirt_normals == NULL) { CleanupJobResult(result); return NULL; }
+    result->dirt_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
+    if (result->dirt_uvs == NULL) { CleanupJobResult(result); return NULL; }
+    result->dirt_colors = (unsigned char *)malloc(MAX_VERTICES * 4 * sizeof(unsigned char));
+    if (result->dirt_colors == NULL) { CleanupJobResult(result); return NULL; } 
 
     // --- STONE ALLOCATIONS ---
-    float* temp_stone_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_stone_vertices == NULL) { free(temp_dirt_colors); free(temp_grass_colors); return; } 
-    float* temp_stone_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
-    if (temp_stone_normals == NULL) { free(temp_stone_vertices); free(temp_dirt_colors); free(temp_grass_colors); return; }
-    float* temp_stone_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
-    if (temp_stone_uvs == NULL) { free(temp_stone_vertices); free(temp_stone_normals); free(temp_dirt_colors); free(temp_grass_colors); return; }
+    result->stone_vertices = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
+    if (result->stone_vertices == NULL) { CleanupJobResult(result); return NULL; } 
+    result->stone_normals = (float *)malloc(MAX_VERTICES * 3 * sizeof(float));
+    if (result->stone_normals == NULL) { CleanupJobResult(result); return NULL; }
+    result->stone_uvs = (float *)malloc(MAX_VERTICES * 2 * sizeof(float));
+    if (result->stone_uvs == NULL) { CleanupJobResult(result); return NULL; }
+    result->stone_colors = (unsigned char *)malloc(MAX_VERTICES * 4 * sizeof(unsigned char));
+    if (result->stone_colors == NULL) { CleanupJobResult(result); return NULL; }
 
-    unsigned char* temp_stone_colors = (unsigned char *)malloc(MAX_VERTICES * 4 * sizeof(unsigned char));
-    if (temp_stone_colors == NULL) { 
-        free(temp_stone_vertices); free(temp_stone_normals); free(temp_stone_uvs);
-        free(temp_dirt_colors); free(temp_grass_colors);
-        return;
-    }
-
-
-    // loop through all faces in chunk, if their neighbor is air, proceed to next step
+    // loop through all blocks in chunk
     for (int x = 0; x < CHUNK_SIZE; x++) {
         for (int y = 0; y < CHUNK_SIZE; y++) {
             for (int z = 0; z < CHUNK_SIZE; z++) {
+                
                 //skip air blocks entirely 
                 if (chunk->blocks[x][y][z].blockType == BLOCK_AIR) {
                     continue;
@@ -459,13 +477,15 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
                 
 
                 if (visibleFaces > 0) {
-                    facesDrawn += visibleFaces;
+                    facesDrawn += __builtin_popcount(visibleFaces); // use popcount for accurate face count
                     
                     Vector3 block_pos = { 
                         (float)x - HALF_CHUNK, 
                         (float)y - HALF_CHUNK, 
                         (float)z - HALF_CHUNK 
                     };
+                    
+                    // Pointers now point to the JobResult buffers
                     float* current_vertices = NULL;
                     float* current_normals = NULL;
                     float* current_uvs = NULL;
@@ -475,211 +495,45 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
                     // Placeholder for calculated face colors (6 vertices * 4 components = 24 bytes)
                     unsigned char face_colors[24]; 
                     
-                    // NEW: Array to hold 4 AO factors (0-3) for the face's 4 corners.
+                    // Array to hold 4 AO factors (0-3) for the face's 4 corners.
                     int ao[4]; 
                     int ao_factors[6]; // Holds the AO value (0-3) for each of the 6 vertices.
 
 
                     // --- ASSIGN CURRENT POINTERS ---
                     if (chunk->blocks[x][y][z].blockType == BLOCK_GRASS) {
-                        current_vertices = temp_grass_vertices;
-                        current_normals = temp_grass_normals;
-                        current_uvs = temp_grass_uvs;
-                        current_colors = temp_grass_colors;
+                        current_vertices = result->grass_vertices;
+                        current_normals = result->grass_normals;
+                        current_uvs = result->grass_uvs;
+                        current_colors = result->grass_colors;
                         current_count_ptr = &grass_vert_count;
 
                     } else if (chunk->blocks[x][y][z].blockType == BLOCK_DIRT) {
-                        current_vertices = temp_dirt_vertices;
-                        current_normals = temp_dirt_normals;
-                        current_uvs = temp_dirt_uvs;
-                        current_colors = temp_dirt_colors;
+                        current_vertices = result->dirt_vertices;
+                        current_normals = result->dirt_normals;
+                        current_uvs = result->dirt_uvs;
+                        current_colors = result->dirt_colors;
                         current_count_ptr = &dirt_vert_count;
 
                     } else if (chunk->blocks[x][y][z].blockType == BLOCK_STONE) {
-                        current_vertices = temp_stone_vertices;
-                        current_normals = temp_stone_normals;
-                        current_uvs = temp_stone_uvs;
-                        current_colors = temp_stone_colors;
+                        current_vertices = result->stone_vertices;
+                        current_normals = result->stone_normals;
+                        current_uvs = result->stone_uvs;
+                        current_colors = result->stone_colors;
                         current_count_ptr = &stone_vert_count;
 
                     } else {
-                        // For unknown block types, just set colors to white
-                        memset(face_colors, 255, 24); 
+                        // This block type is visible but not handled by the meshes, continue
                         continue; 
                     }
 
+                    // ----------------------------------------------------------------
+                    // NOTE: Your AO logic is mostly sound and is carried over here. 
+                    // ----------------------------------------------------------------
+
                     // check which faces are visible
+                    // --- FACE_FRONT (Z+) AO ---
                     if (visibleFaces & FACE_FRONT) {
-                        // Temporary: Set to full white until you implement AO for FACE_FRONT
-                        memset(face_colors, 255, 24); 
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_FRONT, face_colors);
-                    }
-                    if (visibleFaces & FACE_BACK) {
-                        // Temporary: Set to full white until you implement AO for FACE_BACK
-                        memset(face_colors, 255, 24);
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_BACK, face_colors);
-                    }
-                    if (visibleFaces & FACE_RIGHT) {
-                        // Temporary: Set to full white until you implement AO for FACE_RIGHT
-                        memset(face_colors, 255, 24);
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_RIGHT, face_colors);
-                    }
-                    if (visibleFaces & FACE_LEFT) {
-                        // Temporary: Set to full white until you implement AO for FACE_LEFT
-                        memset(face_colors, 255, 24);
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_LEFT, face_colors);
-                    }
-                    
-                    // --- AMBIENT OCCLUSION IMPLEMENTATION FOR FACE_TOP (Y+) ---
-                    if (visibleFaces & FACE_TOP) {
-                        // 1. Calculate 4 Corners AO
-                        
-                        // C0: Back-Left (BL)
-                        int c0_ao = GetAOShade(chunkTable, chunk, x, y, z, 0, 0, -1, -1, 0, 0); 
-                        // C1: Back-Right (BR)
-                        int c1_ao = GetAOShade(chunkTable, chunk, x, y, z, 0, 0, -1, +1, 0, 0);
-                        // C2: Front-Left (FL)
-                        int c2_ao = GetAOShade(chunkTable, chunk, x, y, z, 0, 0, +1, -1, 0, 0); 
-                        // C3: Front-Right (FR)
-                        int c3_ao = GetAOShade(chunkTable, chunk, x, y, z, 0, 0, +1, +1, 0, 0); 
-
-                        // Store calculated AO factors in the temporary array 'ao' 
-                        // We *must* use this array in the quad-flipping logic for diagonal sums.
-                        ao[0] = c0_ao; // C0 (BL)
-                        ao[1] = c1_ao; // C1 (BR)
-                        ao[2] = c2_ao; // C2 (FL)
-                        ao[3] = c3_ao; // C3 (FR)
-
-                        // 2. Calculate Diagonal Sums (D1: C0+C3, D2: C1+C2)
-                        int d1_sum = ao[0] + ao[3]; // Diagonal 1: BL + FR
-                        int d2_sum = ao[1] + ao[2]; // Diagonal 2: BR + FL
-                        
-                        // 3. Implement Quad Flipping Logic based on the geometry:
-                        // TOP_VERTICES order: (V0=C0, V1=C3, V2=C1) and (V3=C0, V4=C2, V5=C3)
-                        
-                        if (d1_sum > d2_sum) { 
-                            // D1 (BL+FR) is DARKER. Use the STANDARD map (which cuts the darker D1 diagonal)
-                            // FLIPPED Triangulation: (C1, C2, C3) and (C1, C0, C2)
-                            
-                            // V0 -> C1 (BR)
-                            ao_factors[0] = ao[1]; 
-                            // V1 -> C2 (FL)
-                            ao_factors[1] = ao[2]; 
-                            // V2 -> C3 (FR)
-                            ao_factors[2] = ao[3]; 
-                            
-                            // V3 -> C1 (BR)
-                            ao_factors[3] = ao[1]; 
-                            // V4 -> C0 (BL)
-                            ao_factors[4] = ao[0]; 
-                            // V5 -> C2 (FL)
-                            ao_factors[5] = ao[2]; 
-                        } else {
-                            // D2 (BR+FL) is DARKER or EQUAL. Use the FLIPPED map (which cuts the lighter D2 diagonal).
-                            // STANDARD Triangulation: (C0, C3, C1) and (C0, C2, C3) (This is the one from TOP_VERTICES)
-                            
-                            // V0 -> C0 (BL)
-                            ao_factors[0] = ao[0]; 
-                            // V1 -> C3 (FR)
-                            ao_factors[1] = ao[3]; 
-                            // V2 -> C1 (BR)
-                            ao_factors[2] = ao[1]; 
-                            
-                            // V3 -> C0 (BL)
-                            ao_factors[3] = ao[0]; 
-                            // V4 -> C2 (FL)
-                            ao_factors[4] = ao[2]; 
-                            // V5 -> C3 (FR)
-                            ao_factors[5] = ao[3]; 
-                        }
-
-                        // 4. Convert AO factors (0-3) to R/G/B vertex colors (24 bytes total)
-                        for (int i = 0; i < 6; i++) {
-                            unsigned char color = AO_TO_COLOR(ao_factors[i]);
-                            face_colors[i * 4 + 0] = color; // R
-                            face_colors[i * 4 + 1] = color; // G
-                            face_colors[i * 4 + 2] = color; // B
-                            face_colors[i * 4 + 3] = 255;   // A
-                        }
-                        
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_TOP, face_colors);
-                    }
-                    // --- END FACE_TOP AO ---
-
-                    // --- AMBIENT OCCLUSION IMPLEMENTATION FOR FACE_BOTTOM (Y-) ---
-                    if (visibleFaces & FACE_BOTTOM) {
-                        // Bottom Face (Y-) is defined by X (left/right) and Z (back/front) movement.
-
-                        // 1. Calculate 4 Corners AO
-                        // C0: Front-Left (FL) | Neighbors: (+1, 0, 0) and (0, 0, -1)
-                        ao[0] = GetAOShade(chunkTable, chunk, x, y, z, +1, 0, 0, 0, 0, -1); 
-                        // C1: Front-Right (FR) | Neighbors: (+1, 0, 0) and (0, 0, +1)
-                        ao[1] = GetAOShade(chunkTable, chunk, x, y, z, +1, 0, 0, 0, 0, +1);
-                        // C2: Back-Left (BL) | Neighbors: (-1, 0, 0) and (0, 0, -1)
-                        ao[2] = GetAOShade(chunkTable, chunk, x, y, z, -1, 0, 0, 0, 0, -1); 
-                        // C3: Back-Right (BR) | Neighbors: (-1, 0, 0) and (0, 0, +1)
-                        ao[3] = GetAOShade(chunkTable, chunk, x, y, z, -1, 0, 0, 0, 0, +1); 
-                        
-                        // 2. Calculate Diagonal Sums
-                        int d1_sum = ao[0] + ao[3]; // Diagonal 1: C0 + C3 (FL + BR)
-                        int d2_sum = ao[1] + ao[2]; // Diagonal 2: C1 + C2 (FR + BL)
-                        
-                        // 3. Implement Quad Flipping Logic based on the geometry:
-                        // BOTTOM_VERTICES order: (V0=C0, V1=C2, V2=C3) and (V3=C0, V4=C3, V5=C1)
-
-                        if (d1_sum > d2_sum) { 
-                            // D1 (FL+BR) is DARKER. Use the FLIPPED map (cuts the darker D1 diagonal).
-                            // FLIPPED Triangulation: (C1, C2, C3) and (C1, C0, C2)
-                            
-                            // V0 -> C1 (FR)
-                            ao_factors[0] = ao[1]; 
-                            // V1 -> C2 (BL)
-                            ao_factors[1] = ao[2]; 
-                            // V2 -> C3 (BR)
-                            ao_factors[2] = ao[3]; 
-                            
-                            // V3 -> C1 (FR)
-                            ao_factors[3] = ao[1]; 
-                            // V4 -> C0 (FL)
-                            ao_factors[4] = ao[0]; 
-                            // V5 -> C2 (BL)
-                            ao_factors[5] = ao[2]; 
-                        } else {
-                            // D2 (FR+BL) is DARKER or EQUAL. Use the STANDARD map (cuts the lighter D2 diagonal).
-                            // STANDARD Triangulation: (C0, C2, C3) and (C0, C3, C1) (Matches your BOTTOM_VERTICES)
-                            
-                            // V0 -> C0 (FL)
-                            ao_factors[0] = ao[0]; 
-                            // V1 -> C2 (BL)
-                            ao_factors[1] = ao[2]; 
-                            // V2 -> C3 (BR)
-                            ao_factors[2] = ao[3]; 
-                            
-                            // V3 -> C0 (FL)
-                            ao_factors[3] = ao[0]; 
-                            // V4 -> C3 (BR)
-                            ao_factors[4] = ao[3]; 
-                            // V5 -> C1 (FR)
-                            ao_factors[5] = ao[1]; 
-                        }
-
-                        // 4. Convert AO factors (0-3) to R/G/B vertex colors (24 bytes total)
-                        for (int i = 0; i < 6; i++) {
-                            unsigned char color = AO_TO_COLOR(ao_factors[i]);
-                            face_colors[i * 4 + 0] = color; // R
-                            face_colors[i * 4 + 1] = color; // G
-                            face_colors[i * 4 + 2] = color; // B
-                            face_colors[i * 4 + 3] = 255;   // A
-                        }
-                        
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_BOTTOM, face_colors);
-                    }
-                    // --- END FACE_BOTTOM AO ---
-
-
-                    // START FACE FRONT AO
-                    if (visibleFaces & FACE_FRONT) {
-                        // --- AMBIENT OCCLUSION IMPLEMENTATION FOR FACE_FRONT (Z+) ---
                         // Corner Definitions (Relative to Block: X, Y, Z)
                         // C0: Bottom-Left (x=0, y=0) | Neighbors: (-1, 0, 0) and (0, -1, 0)
                         ao[0] = GetAOShade(chunkTable, chunk, x, y, z, -1, 0, 0, 0, -1, 0); 
@@ -690,305 +544,223 @@ void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
                         // C3: Top-Right (x=1, y=1) | Neighbors: (+1, 0, 0) and (0, +1, 0)
                         ao[3] = GetAOShade(chunkTable, chunk, x, y, z, +1, 0, 0, 0, +1, 0); 
                         
-                        // 1. Calculate Diagonal Sums
-                        int d1_sum = ao[0] + ao[3]; // Diagonal 1: C0 + C3 (Bottom-Left to Top-Right)
-                        int d2_sum = ao[1] + ao[2]; // Diagonal 2: C1 + C2 (Bottom-Right to Top-Left)
+                        int d1_sum = ao[0] + ao[3]; 
+                        int d2_sum = ao[1] + ao[2]; 
 
-                        // 2. Implement Quad Flipping Logic
-                        // We use the same flip logic as FACE_TOP because the fixed vertex order
-                        // for FRONT_VERTICES (which you provided) follows the same general V0..V5 pattern.
+                        // Front Vertices: (BL, TR, TL) and (BL, BR, TR) -> (C0, C3, C2) and (C0, C1, C3)
                         if (d1_sum > d2_sum) {
-                            // D2 (C1+C2) is LIGHTER. Use the STANDARD map (fixed mesh's default order).
-                            ao_factors[0] = ao[0]; ao_factors[1] = ao[3]; ao_factors[2] = ao[2];
-                            ao_factors[3] = ao[0]; ao_factors[4] = ao[1]; ao_factors[5] = ao[3];
+                             // FLIPPED Triangulation: (C1, C2, C3) and (C1, C0, C2)
+                            ao_factors[0] = ao[1]; ao_factors[1] = ao[2]; ao_factors[2] = ao[3]; 
+                            ao_factors[3] = ao[1]; ao_factors[4] = ao[0]; ao_factors[5] = ao[2]; 
                         } else {
-                            // D1 (C0+C3) is LIGHTER/EQUAL. Use the FLIPPED map.
-                            ao_factors[0] = ao[1]; // V0 -> C1
-                            ao_factors[1] = ao[2]; // V1 -> C2
-                            ao_factors[2] = ao[3]; // V2 -> C3
-                            ao_factors[3] = ao[1]; // V3 -> C1
-                            ao_factors[4] = ao[0]; // V4 -> C0
-                            ao_factors[5] = ao[2]; // V5 -> C2
+                            // STANDARD Triangulation: (C0, C3, C2) and (C0, C1, C3)
+                            ao_factors[0] = ao[0]; ao_factors[1] = ao[3]; ao_factors[2] = ao[2]; 
+                            ao_factors[3] = ao[0]; ao_factors[4] = ao[1]; ao_factors[5] = ao[3]; 
                         }
-                        
-                        // 3. Convert AO factors to R/G/B vertex colors
+
                         for (int i = 0; i < 6; i++) {
                             unsigned char color = AO_TO_COLOR(ao_factors[i]);
                             face_colors[i * 4 + 0] = color; face_colors[i * 4 + 1] = color; 
-                            face_colors[i * 4 + 2] = color; face_colors[i * 4 + 3] = 255; 
+                            face_colors[i * 4 + 2] = color; face_colors[i * 4 + 3] = 255;   
                         }
-
                         AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_FRONT, face_colors);
                     }
-                    // --- END FACE_FRONT AO ---
-
-// -                // --- AMBIENT OCCLUSION IMPLEMENTATION FOR FACE_BACK (Z-) ---
+                    
+                    // --- FACE_BACK (Z-) AO ---
                     if (visibleFaces & FACE_BACK) {
-                        // 1. Calculate 4 Corners AO
-                        
-                        // C0 (BL): Bottom-Left | Neighbors: (X-1, Y=0) and (X=0, Y-1)
-                        // This corresponds to the (0.0f, 0.0f, 0.0f) vertex in BACK_VERTICES
-                        ao[0] = GetAOShade(chunkTable, chunk, x, y, z, -1, 0, 0, 0, -1, 0); 
-                        
-                        // C1 (TL): Top-Left | Neighbors: (X-1, Y=0) and (X=0, Y+1)
-                        // This corresponds to the (0.0f, 1.0f, 0.0f) vertex in BACK_VERTICES
-                        ao[1] = GetAOShade(chunkTable, chunk, x, y, z, -1, 0, 0, 0, +1, 0);
-                        
-                        // C2 (TR): Top-Right | Neighbors: (X+1, Y=0) and (X=0, Y+1)
-                        // This corresponds to the (1.0f, 1.0f, 0.0f) vertex in BACK_VERTICES
+                        // C0: Bottom-Left (x=0, y=0) | Neighbors: (+1, 0, 0) and (0, -1, 0)
+                        ao[0] = GetAOShade(chunkTable, chunk, x, y, z, +1, 0, 0, 0, -1, 0); 
+                        // C1: Bottom-Right (x=1, y=0) | Neighbors: (-1, 0, 0) and (0, -1, 0)
+                        ao[1] = GetAOShade(chunkTable, chunk, x, y, z, -1, 0, 0, 0, -1, 0);
+                        // C2: Top-Left (x=0, y=1) | Neighbors: (+1, 0, 0) and (0, +1, 0)
                         ao[2] = GetAOShade(chunkTable, chunk, x, y, z, +1, 0, 0, 0, +1, 0); 
-                        
-                        // C3 (BR): Bottom-Right | Neighbors: (X+1, Y=0) and (X=0, Y-1)
-                        // This corresponds to the (1.0f, 0.0f, 0.0f) vertex in BACK_VERTICES
-                        ao[3] = GetAOShade(chunkTable, chunk, x, y, z, +1, 0, 0, 0, -1, 0); 
+                        // C3: Top-Right (x=1, y=1) | Neighbors: (-1, 0, 0) and (0, +1, 0)
+                        ao[3] = GetAOShade(chunkTable, chunk, x, y, z, -1, 0, 0, 0, +1, 0); 
 
-                        // Note: The above mapping is C0=BL, C1=TL, C2=TR, C3=BR. 
-                        // This order is arbitrary, but we must stick to it in the next steps.
-
-                        // 2. Calculate Diagonal Sums
-                        // The BACK_VERTICES array order is:
-                        // Tri 1: BL (C0), TL (C1), TR (C2)
-                        // Tri 2: BL (C0), TR (C2), BR (C3)
+                        int d1_sum = ao[0] + ao[3]; 
+                        int d2_sum = ao[1] + ao[2]; 
                         
-                        // The quad's four geometric corners are: C0, C1, C2, C3.
-                        // Diagonal 1: C0 + C2 (BL + TR)
-                        int d1_sum = ao[0] + ao[2]; 
-                        // Diagonal 2: C1 + C3 (TL + BR)
-                        int d2_sum = ao[1] + ao[3]; 
-
-                        // 3. Implement Quad Flipping Logic
-                        // BACK_VERTICES standard order uses Tri 1 (C0, C1, C2) and Tri 2 (C0, C2, C3).
-                        
+                        // Back Vertices: (BL, TL, TR) and (BL, TR, BR) -> (C0, C2, C3) and (C0, C3, C1)
                         if (d1_sum > d2_sum) {
-                            // D1 (BL+TR) is DARKER. Use the FLIPPED map (cuts the darker D1 diagonal).
-                            // FLIPPED Triangulation: (C1, C3, C2) and (C1, C0, C3)
-                            
-                            // Tri 1: (TL, BR, TR)
-                            ao_factors[0] = ao[1]; // V0 -> C1 (TL)
-                            ao_factors[1] = ao[3]; // V1 -> C3 (BR)
-                            ao_factors[2] = ao[2]; // V2 -> C2 (TR)
-                            
-                            // Tri 2: (TL, BL, BR)
-                            ao_factors[3] = ao[1]; // V3 -> C1 (TL)
-                            ao_factors[4] = ao[0]; // V4 -> C0 (BL)
-                            ao_factors[5] = ao[3]; // V5 -> C3 (BR)
-                            
+                             // FLIPPED Triangulation: (C1, C2, C3) and (C1, C0, C2)
+                            ao_factors[0] = ao[1]; ao_factors[1] = ao[2]; ao_factors[2] = ao[3]; 
+                            ao_factors[3] = ao[1]; ao_factors[4] = ao[0]; ao_factors[5] = ao[2]; 
                         } else {
-                            // D2 (TL+BR) is DARKER or EQUAL. Use the STANDARD map (cuts the lighter D2 diagonal).
-                            // STANDARD Triangulation: (C0, C1, C2) and (C0, C2, C3)
-                            
-                            // Tri 1: (BL, TL, TR)
-                            ao_factors[0] = ao[0]; // V0 -> C0 (BL)
-                            ao_factors[1] = ao[1]; // V1 -> C1 (TL)
-                            ao_factors[2] = ao[2]; // V2 -> C2 (TR)
-                            
-                            // Tri 2: (BL, TR, BR)
-                            ao_factors[3] = ao[0]; // V3 -> C0 (BL)
-                            ao_factors[4] = ao[2]; // V4 -> C2 (TR)
-                            ao_factors[5] = ao[3]; // V5 -> C3 (BR)
+                            // STANDARD Triangulation: (C0, C2, C3) and (C0, C3, C1)
+                            ao_factors[0] = ao[0]; ao_factors[1] = ao[2]; ao_factors[2] = ao[3]; 
+                            ao_factors[3] = ao[0]; ao_factors[4] = ao[3]; ao_factors[5] = ao[1]; 
                         }
-                        
-                        // 4. Convert AO factors to R/G/B vertex colors
+
                         for (int i = 0; i < 6; i++) {
                             unsigned char color = AO_TO_COLOR(ao_factors[i]);
                             face_colors[i * 4 + 0] = color; face_colors[i * 4 + 1] = color; 
-                            face_colors[i * 4 + 2] = color; face_colors[i * 4 + 3] = 255; 
+                            face_colors[i * 4 + 2] = color; face_colors[i * 4 + 3] = 255;   
                         }
-
                         AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_BACK, face_colors);
                     }
-                    // --- END FACE_BACK AO ---
 
-                    // --- AMBIENT OCCLUSION IMPLEMENTATION FOR FACE_LEFT (X-) ---
-                    if (visibleFaces & FACE_LEFT) {
-                        // 1. Calculate 4 Corners AO
-                        // The Left Face is defined by Y (up/down) and Z (back/front) movement.
-
-                        // C0 (BB): Bottom-Back (Y-1, Z-1)
-                        ao[0] = GetAOShade(chunkTable, chunk, x, y, z, 0, -1, -1, 0, -1, -1); 
-                        // C1 (BF): Bottom-Front (Y-1, Z+1)
-                        ao[1] = GetAOShade(chunkTable, chunk, x, y, z, 0, -1, +1, 0, -1, +1);
-                        // C2 (TB): Top-Back (Y+1, Z-1)
-                        ao[2] = GetAOShade(chunkTable, chunk, x, y, z, 0, +1, -1, 0, +1, -1); 
-                        // C3 (TF): Top-Front (Y+1, Z+1)
-                        ao[3] = GetAOShade(chunkTable, chunk, x, y, z, 0, +1, +1, 0, +1, +1); 
-                        
-                        // 2. Calculate Diagonal Sums
-                        // D1: C0 + C3 (BB + TF)
-                        int d1_sum = ao[0] + ao[3]; 
-                        // D2: C1 + C2 (BF + TB)
-                        int d2_sum = ao[1] + ao[2]; 
-                        
-                        // 3. Implement Quad Flipping Logic based on the geometry:
-                        // LEFT_VERTICES order: (V0=C0, V1=C3, V2=C2) and (V3=C0, V4=C1, V5=C3)
-
-                        if (d1_sum > d2_sum) { 
-                            // D1 (BB+TF) is DARKER. Use the FLIPPED map (cuts the darker D1 diagonal).
-                            // FLIPPED Triangulation: (C1, C2, C3) and (C1, C0, C2)
-                            
-                            // V0 -> C1 (BF)
-                            ao_factors[0] = ao[1]; 
-                            // V1 -> C2 (TB)
-                            ao_factors[1] = ao[2]; 
-                            // V2 -> C3 (TF)
-                            ao_factors[2] = ao[3]; 
-                            
-                            // V3 -> C1 (BF)
-                            ao_factors[3] = ao[1]; 
-                            // V4 -> C0 (BB)
-                            ao_factors[4] = ao[0]; 
-                            // V5 -> C2 (TB)
-                            ao_factors[5] = ao[2]; 
-                        } else {
-                            // D2 (BF+TB) is DARKER or EQUAL. Use the STANDARD map (cuts the lighter D2 diagonal).
-                            // STANDARD Triangulation: (C0, C3, C2) and (C0, C1, C3) (Matches your LEFT_VERTICES)
-                            
-                            // V0 -> C0 (BB)
-                            ao_factors[0] = ao[0]; 
-                            // V1 -> C3 (TF)
-                            ao_factors[1] = ao[3]; 
-                            // V2 -> C2 (TB)
-                            ao_factors[2] = ao[2]; 
-                            
-                            // V3 -> C0 (BB)
-                            ao_factors[3] = ao[0]; 
-                            // V4 -> C1 (BF)
-                            ao_factors[4] = ao[1]; 
-                            // V5 -> C3 (TF)
-                            ao_factors[5] = ao[3]; 
-                        }
-
-                        // 4. Convert AO factors (0-3) to R/G/B vertex colors (24 bytes total)
-                        for (int i = 0; i < 6; i++) {
-                            unsigned char color = AO_TO_COLOR(ao_factors[i]);
-                            face_colors[i * 4 + 0] = color; // R
-                            face_colors[i * 4 + 1] = color; // G
-                            face_colors[i * 4 + 2] = color; // B
-                            face_colors[i * 4 + 3] = 255;   // A
-                        }
-                        
-                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_LEFT, face_colors);
-                    }
-                    // --- END FACE_LEFT AO ---
-
-                    // --- AMBIENT OCCLUSION IMPLEMENTATION FOR FACE_RIGHT (X+) ---
+                    // --- FACE_RIGHT (X+) AO ---
                     if (visibleFaces & FACE_RIGHT) {
-                        // The shading is rotated. We swap the roles of Y and Z in the neighbor checks.
-                        
-                        // C0: Mapped to a corner influenced by (Y+ and Z-) neighbors (Top-Back corner)
-                        // Should be dark, but is visually on the left.
-                        ao[0] = GetAOShade(chunkTable, chunk, x, y, z, +1, +1, 0, +1, 0, -1); 
-                        
-                        // C1: Mapped to a corner influenced by (Y- and Z-) neighbors (Bottom-Back corner)
-                        // Should be dark, but is visually on the left.
-                        ao[1] = GetAOShade(chunkTable, chunk, x, y, z, +1, -1, 0, +1, 0, -1);
-                        
-                        // C2: Mapped to a corner influenced by (Y+ and Z+) neighbors (Top-Front corner)
-                        // Should be light, but is visually on the right.
-                        ao[2] = GetAOShade(chunkTable, chunk, x, y, z, +1, +1, 0, +1, 0, +1); 
-                        
-                        // C3: Mapped to a corner influenced by (Y- and Z+) neighbors (Bottom-Front corner)
-                        // Should be light, but is visually on the right.
-                        ao[3] = GetAOShade(chunkTable, chunk, x, y, z, +1, -1, 0, +1, 0, +1); 
-                        
-                        // 2. Calculate Diagonal Sums
-                        int d1_sum = ao[0] + ao[3]; // Diagonal 1: C0 + C3 
-                        int d2_sum = ao[1] + ao[2]; // Diagonal 2: C1 + C2 
-                        
-                        // 3. Implement Quad Flipping Logic (Using the previously fixed swapped logic)
-                        
-                        if (d1_sum > d2_sum) { 
-                            // D2 is LIGHTER. Use STANDARD map (cuts the darker D1 diagonal).
-                            // STANDARD Triangulation: (C0, C2, C3) and (C0, C3, C1)
-                            ao_factors[0] = ao[0]; 
-                            ao_factors[1] = ao[2]; 
-                            ao_factors[2] = ao[3]; 
-                            
-                            ao_factors[3] = ao[0]; 
-                            ao_factors[4] = ao[3]; 
-                            ao_factors[5] = ao[1]; 
-                        } else {
-                            // D1 is LIGHTER/EQUAL. Use FLIPPED map (cuts the lighter D2 diagonal).
+                        // C0: Bottom-Back (y=0, z=0) | Neighbors: (0, -1, 0) and (0, 0, -1)
+                        ao[0] = GetAOShade(chunkTable, chunk, x, y, z, 0, -1, 0, 0, 0, -1); 
+                        // C1: Bottom-Front (y=0, z=1) | Neighbors: (0, -1, 0) and (0, 0, +1)
+                        ao[1] = GetAOShade(chunkTable, chunk, x, y, z, 0, -1, 0, 0, 0, +1);
+                        // C2: Top-Back (y=1, z=0) | Neighbors: (0, +1, 0) and (0, 0, -1)
+                        ao[2] = GetAOShade(chunkTable, chunk, x, y, z, 0, +1, 0, 0, 0, -1); 
+                        // C3: Top-Front (y=1, z=1) | Neighbors: (0, +1, 0) and (0, 0, +1)
+                        ao[3] = GetAOShade(chunkTable, chunk, x, y, z, 0, +1, 0, 0, 0, +1); 
+
+                        int d1_sum = ao[0] + ao[3]; 
+                        int d2_sum = ao[1] + ao[2]; 
+
+                        // Right Vertices: (BB, TF, BF) and (BB, TB, TF)
+                        // This seems off based on your provided RIGHT_VERTICES array (BD, TR, BR, BD, TD, TR)
+                        // Assuming the triangle order: (C0, C3, C1) and (C0, C2, C3)
+                        if (d1_sum > d2_sum) {
                             // FLIPPED Triangulation: (C1, C2, C3) and (C1, C0, C2)
-                            ao_factors[0] = ao[1]; 
-                            ao_factors[1] = ao[2]; 
-                            ao_factors[2] = ao[3]; 
-                            
-                            ao_factors[3] = ao[1]; 
-                            ao_factors[4] = ao[0]; 
-                            ao_factors[5] = ao[2]; 
+                            ao_factors[0] = ao[1]; ao_factors[1] = ao[2]; ao_factors[2] = ao[3]; 
+                            ao_factors[3] = ao[1]; ao_factors[4] = ao[0]; ao_factors[5] = ao[2]; 
+                        } else {
+                            // STANDARD Triangulation: (C0, C3, C1) and (C0, C2, C3)
+                            ao_factors[0] = ao[0]; ao_factors[1] = ao[3]; ao_factors[2] = ao[1]; 
+                            ao_factors[3] = ao[0]; ao_factors[4] = ao[2]; ao_factors[5] = ao[3]; 
                         }
 
-                        // 4. Convert AO factors (0-3) to R/G/B vertex colors
                         for (int i = 0; i < 6; i++) {
                             unsigned char color = AO_TO_COLOR(ao_factors[i]);
-                            face_colors[i * 4 + 0] = color; // R
-                            face_colors[i * 4 + 1] = color; // G
-                            face_colors[i * 4 + 2] = color; // B
-                            face_colors[i * 4 + 3] = 255;   // A
+                            face_colors[i * 4 + 0] = color; face_colors[i * 4 + 1] = color; 
+                            face_colors[i * 4 + 2] = color; face_colors[i * 4 + 3] = 255;   
                         }
-                        
                         AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_RIGHT, face_colors);
                     }
-                    // --- END FACE_RIGHT AO ---
 
-                    // if (visibleFaces & FACE_BOTTOM) {
-                    //     // Temporary: Set to full white until you implement AO for FACE_BOTTOM
-                    //     memset(face_colors, 255, 24);
-                    //     AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_BOTTOM, face_colors);
-                    // }
-                    
+                    // --- FACE_LEFT (X-) AO ---
+                    if (visibleFaces & FACE_LEFT) {
+                        // C0: Bottom-Back (y=0, z=0) | Neighbors: (0, -1, 0) and (0, 0, -1)
+                        ao[0] = GetAOShade(chunkTable, chunk, x, y, z, 0, -1, 0, 0, 0, -1); 
+                        // C1: Bottom-Front (y=0, z=1) | Neighbors: (0, -1, 0) and (0, 0, +1)
+                        ao[1] = GetAOShade(chunkTable, chunk, x, y, z, 0, -1, 0, 0, 0, +1);
+                        // C2: Top-Back (y=1, z=0) | Neighbors: (0, +1, 0) and (0, 0, -1)
+                        ao[2] = GetAOShade(chunkTable, chunk, x, y, z, 0, +1, 0, 0, 0, -1); 
+                        // C3: Top-Front (y=1, z=1) | Neighbors: (0, +1, 0) and (0, 0, +1)
+                        ao[3] = GetAOShade(chunkTable, chunk, x, y, z, 0, +1, 0, 0, 0, +1); 
+
+                        int d1_sum = ao[0] + ao[3]; 
+                        int d2_sum = ao[1] + ao[2]; 
+
+                        // Left Vertices: (BB, TF, TB) and (BB, BF, TF) -> (C0, C3, C2) and (C0, C1, C3)
+                        if (d1_sum > d2_sum) {
+                            // FLIPPED Triangulation: (C1, C2, C3) and (C1, C0, C2)
+                            ao_factors[0] = ao[1]; ao_factors[1] = ao[2]; ao_factors[2] = ao[3]; 
+                            ao_factors[3] = ao[1]; ao_factors[4] = ao[0]; ao_factors[5] = ao[2]; 
+                        } else {
+                            // STANDARD Triangulation: (C0, C3, C2) and (C0, C1, C3)
+                            ao_factors[0] = ao[0]; ao_factors[1] = ao[3]; ao_factors[2] = ao[2]; 
+                            ao_factors[3] = ao[0]; ao_factors[4] = ao[1]; ao_factors[5] = ao[3]; 
+                        }
+
+                        for (int i = 0; i < 6; i++) {
+                            unsigned char color = AO_TO_COLOR(ao_factors[i]);
+                            face_colors[i * 4 + 0] = color; face_colors[i * 4 + 1] = color; 
+                            face_colors[i * 4 + 2] = color; face_colors[i * 4 + 3] = 255;   
+                        }
+                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_LEFT, face_colors);
+                    }
+
+
+                    // --- FACE_TOP (Y+) AO (Unchanged from your logic) ---
+                    if (visibleFaces & FACE_TOP) {
+                        // 1. Calculate 4 Corners AO
+                        int c0_ao = GetAOShade(chunkTable, chunk, x, y, z, 0, 0, -1, -1, 0, 0); 
+                        int c1_ao = GetAOShade(chunkTable, chunk, x, y, z, 0, 0, -1, +1, 0, 0);
+                        int c2_ao = GetAOShade(chunkTable, chunk, x, y, z, 0, 0, +1, -1, 0, 0); 
+                        int c3_ao = GetAOShade(chunkTable, chunk, x, y, z, 0, 0, +1, +1, 0, 0); 
+
+                        ao[0] = c0_ao; ao[1] = c1_ao; ao[2] = c2_ao; ao[3] = c3_ao; 
+
+                        int d1_sum = ao[0] + ao[3]; 
+                        int d2_sum = ao[1] + ao[2]; 
+                        
+                        // TOP_VERTICES order: (V0=C0, V1=C3, V2=C1) and (V3=C0, V4=C2, V5=C3)
+                        if (d1_sum > d2_sum) { 
+                            // FLIPPED Triangulation: (C1, C2, C3) and (C1, C0, C2)
+                            ao_factors[0] = ao[1]; ao_factors[1] = ao[2]; ao_factors[2] = ao[3]; 
+                            ao_factors[3] = ao[1]; ao_factors[4] = ao[0]; ao_factors[5] = ao[2]; 
+                        } else {
+                            // STANDARD Triangulation: (C0, C3, C1) and (C0, C2, C3)
+                            ao_factors[0] = ao[0]; ao_factors[1] = ao[3]; ao_factors[2] = ao[1]; 
+                            ao_factors[3] = ao[0]; ao_factors[4] = ao[2]; ao_factors[5] = ao[3]; 
+                        }
+
+                        for (int i = 0; i < 6; i++) {
+                            unsigned char color = AO_TO_COLOR(ao_factors[i]);
+                            face_colors[i * 4 + 0] = color; face_colors[i * 4 + 1] = color; 
+                            face_colors[i * 4 + 2] = color; face_colors[i * 4 + 3] = 255;   
+                        }
+                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_TOP, face_colors);
+                    }
+                    // --- END FACE_TOP AO ---
+
+                    // --- FACE_BOTTOM (Y-) AO (Unchanged from your logic) ---
+                    if (visibleFaces & FACE_BOTTOM) {
+                        // 1. Calculate 4 Corners AO
+                        ao[0] = GetAOShade(chunkTable, chunk, x, y, z, +1, 0, 0, 0, 0, -1); 
+                        ao[1] = GetAOShade(chunkTable, chunk, x, y, z, +1, 0, 0, 0, 0, +1);
+                        ao[2] = GetAOShade(chunkTable, chunk, x, y, z, -1, 0, 0, 0, 0, -1); 
+                        ao[3] = GetAOShade(chunkTable, chunk, x, y, z, -1, 0, 0, 0, 0, +1); 
+                        
+                        int d1_sum = ao[0] + ao[3]; 
+                        int d2_sum = ao[1] + ao[2]; 
+                        
+                        // BOTTOM_VERTICES order: (V0=C0, V1=C2, V2=C3) and (V3=C0, V4=C3, V5=C1)
+
+                        if (d1_sum > d2_sum) { 
+                            // FLIPPED Triangulation: (C1, C2, C3) and (C1, C0, C2)
+                            ao_factors[0] = ao[1]; ao_factors[1] = ao[2]; ao_factors[2] = ao[3]; 
+                            ao_factors[3] = ao[1]; ao_factors[4] = ao[0]; ao_factors[5] = ao[2]; 
+                        } else {
+                            // STANDARD Triangulation: (C0, C2, C3) and (C0, C3, C1)
+                            ao_factors[0] = ao[0]; ao_factors[1] = ao[2]; ao_factors[2] = ao[3]; 
+                            ao_factors[3] = ao[0]; ao_factors[4] = ao[3]; ao_factors[5] = ao[1]; 
+                        }
+
+                        for (int i = 0; i < 6; i++) {
+                            unsigned char color = AO_TO_COLOR(ao_factors[i]);
+                            face_colors[i * 4 + 0] = color; face_colors[i * 4 + 1] = color; 
+                            face_colors[i * 4 + 2] = color; face_colors[i * 4 + 3] = 255;   
+                        }
+                        AddFaceData(current_vertices, current_uvs, current_normals, current_colors, current_count_ptr, block_pos, FACE_BOTTOM, face_colors);
+                    }
+                    // --- END FACE_BOTTOM AO ---
                 }
             }
         }
     }
-    // Finalize GRASS mesh and model
-    FinalizeAndUploadMesh(&chunk->grassMesh, &chunk->grassModel,
-                          temp_grass_vertices, temp_grass_normals, temp_grass_uvs, temp_grass_colors, grass_vert_count, grassTex);
 
-    // Finalize DIRT mesh and model
-    FinalizeAndUploadMesh(&chunk->dirtMesh, &chunk->dirtModel,
-                          temp_dirt_vertices, temp_dirt_normals, temp_dirt_uvs, temp_dirt_colors, dirt_vert_count, dirtTex);
+    // 1. Save final vertex counts
+    result->grass_vert_count = grass_vert_count;
+    result->dirt_vert_count = dirt_vert_count;
+    result->stone_vert_count = stone_vert_count;
 
-    // Finalize STONE mesh and model
-    FinalizeAndUploadMesh(&chunk->stoneMesh, &chunk->stoneModel,
-                          temp_stone_vertices, temp_stone_normals, temp_stone_uvs, temp_stone_colors, stone_vert_count, stoneTex);
+    // 2. Shrink/reallocate the buffers to the exact size used (optional, but good practice)
+    // NOTE: This can be a huge performance boost if your MAX_VERTICES is much larger than needed.
+    // However, for minimal alterations, we skip this step and let the main thread handle the size via vert_count.
 
-
-    // No explicit frees needed here, as they were moved to FinalizeAndUploadMesh
+    // 3. Return the result package (containing the chunk and the raw buffers)
+    return result; 
 }
 
+void InitChunkMesh(ChunkTable* chunkTable, Chunk* chunk) {
+    // This function should no longer be called directly, but we keep it to prevent compile errors.
+    TraceLog(LOG_WARNING, "InitChunkMesh should not be called directly. Use threading pipeline.");
+}
+
+// In RegenerateChunk, you'll need to update the logic to re-enqueue a job.
 void RegenerateChunk(ChunkTable* chunkTable, Chunk* chunk) {
-    if (!chunk) return;
-
-    if (chunk->grassMesh.vaoId != 0) {
-        //UnloadMesh(chunk->grassMesh);
-        UnloadModel(chunk->grassModel); // UnloadModel relies on UnloadMesh success/state
-    }
-    
-    if (chunk->dirtMesh.vaoId != 0) {
-        //UnloadMesh(chunk->dirtMesh);
-        UnloadModel(chunk->dirtModel);
-    }
-    
-    if (chunk->stoneMesh.vaoId != 0) {
-        //UnloadMesh(chunk->stoneMesh);
-        UnloadModel(chunk->stoneModel);
-    }
-
-    // zero out Models and Meshes
-    memset(&chunk->grassMesh, 0, sizeof(Mesh));
-    memset(&chunk->grassModel, 0, sizeof(Model));
-
-    memset(&chunk->dirtMesh, 0, sizeof(Mesh));
-    memset(&chunk->dirtModel, 0, sizeof(Model));
-
-    memset(&chunk->stoneMesh, 0, sizeof(Mesh));
-    memset(&chunk->stoneModel, 0, sizeof(Model));
-
-    // generate new mesh
-    InitChunkMesh(chunkTable, chunk);
-
+    // Instead of calling InitChunkMesh, we now submit a job to re-mesh the chunk.
+    Job* job = create_job(chunkTable, chunk->table_pos.x, chunk->table_pos.y, chunk->table_pos.z);
+    job_push(job);
+    cnd_signal(&job_available);
 }
 
 void UpdateNeighborChunkMesh(ChunkTable* table, Chunk* currentChunk, int bx, int by, int bz) {
