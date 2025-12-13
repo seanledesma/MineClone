@@ -3,19 +3,20 @@
 
 #include "include.h"
 
-#define CHUNK_SIZE 64
-#define HALF_CHUNK 32
+#define CHUNK_SIZE 32
+#define HALF_CHUNK 16
 #define HASH_TABLE_SIZE 1024
-#define CHUNK_RENDER_MAX 1
+#define CHUNK_RENDER_MAX 5
 
 #define CHUNK_VIEW_DISTANCE (2 * CHUNK_RENDER_MAX + 1)
 #define NEARBY_CHUNK_ARRAY_SIZE (CHUNK_VIEW_DISTANCE * CHUNK_VIEW_DISTANCE * CHUNK_VIEW_DISTANCE)
 
-// NEW: Chunk States
+// Chunk States
 #define CHUNK_STATE_EMPTY          0
-#define CHUNK_STATE_REQUESTED      1 // Job is in the queue
-#define CHUNK_STATE_BLOCKS_READY   2 // Block data generated, worker has meshed, result is in results_queue
-#define CHUNK_STATE_READY          3 // Mesh uploaded to GPU, safe to draw
+#define CHUNK_STATE_REQUESTED      1
+#define CHUNK_STATE_BLOCKS_READY   2
+#define CHUNK_STATE_READY          3
+#define CHUNK_STATE_REGENERATING   4  // Has valid mesh but new one is being generated
 
 extern Vector3 nearbyChunks [NEARBY_CHUNK_ARRAY_SIZE]; 
 extern int nearbyChunkCount;
@@ -48,6 +49,7 @@ typedef struct Chunk{
     Model stoneModel;
 
     int state;
+    bool needsRemesh;  // FIX: Flag to track if another remesh is needed
 }Chunk;
 
 typedef struct ChunkEntry{
@@ -66,7 +68,6 @@ void add_chunk(ChunkTable* table, int cx, int cy, int cz, Chunk* chunk);
 
 Chunk *get_chunk(ChunkTable* table, int cx, int cy, int cz);
 void remove_chunk(ChunkTable* table, int cx, int cy, int cz);
-//void create_chunk(ChunkTable* table, int cx, int cy, int cz);
 Chunk* create_chunk(Job* job);
 Chunk *get_current_chunk(ChunkTable* table, int cx, int cy, int cz);
 void UpdateNearbyChunks(int cx, int cy, int cz);

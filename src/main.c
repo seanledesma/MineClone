@@ -31,11 +31,11 @@ int main(void) {
     mtx_init(&queue_mutex, mtx_plain);
     cnd_init(&job_available);
 
-    // NEW: Initialize results queue primitives
+    // Initialize results queue primitives
     mtx_init(&result_mutex, mtx_plain);
     cnd_init(&result_ready);
 
-    // NEW: Initialize chunk table mutex
+    // Initialize chunk table mutex
     mtx_init(&chunk_table_mutex, mtx_plain);
 
     const int NUM_WORKERS = 4;
@@ -43,23 +43,6 @@ int main(void) {
     for (int i = 0; i < NUM_WORKERS; i++) {
         thrd_create(&worker_threads[i], chunk_generator_worker, NULL);
     }
-    // for (int i = 0; i < NUM_WORKERS; i++) {
-    //     // thrd_create does the following:
-    //     // a) Allocates resources for a new thread.
-    //     // b) Makes this new thread begin execution at the 'chunk_generator_worker' function.
-    //     // c) Passes 'NULL' as the argument (which is the void* arg in the worker function).
-    //     int result = thrd_create(
-    //         &worker_threads[i],          // The thrd_t handle to store the new thread's ID
-    //         chunk_generator_worker,      // The function the new thread will execute (the job loop)
-    //         NULL                         // The argument to pass to the function (void* arg)
-    //     );
-
-    //     if (result != thrd_success) {
-    //         // Handle error: Not enough resources to create a thread
-    //         // raylib: 
-    //         TraceLog(LOG_ERROR, "Failed to create worker thread %d", i);
-    //     }
-    // }
 
     // next I want to update the current chunk as the player moves
     int cx = (int)floor((player.camera.position.x + HALF_CHUNK) / CHUNK_SIZE);
@@ -68,14 +51,12 @@ int main(void) {
 
 
     Chunk *current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
-    Chunk *chunk_iterator = current_chunk;
+    (void)current_chunk; // Suppress unused warning
 
     UpdateNearbyChunks(cx, cy, cz);
     int prevcx = cx;
     int prevcy = cy;
     int prevcz = cz;
-
-    //int blocksRendered = 0;
 
 
     DisableCursor();
@@ -85,28 +66,25 @@ int main(void) {
 
         UpdatePlayer(&chunkTable, &player, dt);
 
-
-
-        /* I am going to do something different here. I will use cx cy and cz as my integer coords for my hash function, and 
-            I will translate those to world coords upon creation */
         cx = (int)floor((player.camera.position.x + HALF_CHUNK) / CHUNK_SIZE);
         cy = (int)floor((player.camera.position.y + HALF_CHUNK) / CHUNK_SIZE);
         cz = (int)floor((player.camera.position.z + HALF_CHUNK) / CHUNK_SIZE);
 
         if (prevcx != cx || prevcy != cy || prevcz != cz) {
             current_chunk = get_current_chunk(&chunkTable, cx, cy, cz);
+            (void)current_chunk;
             UpdateNearbyChunks(cx, cy, cz);
             prevcx = cx;
             prevcy = cy;
             prevcz = cz;
         }
 
-
-        // NEW: Process any completed chunk meshes before drawing the frame
-        ProcessChunkResults();
+        // Process any completed chunk meshes before drawing the frame
         ProcessJobResults(&chunkTable);
         
-        //facesDrawn = 0;
+        // FIX: Reset facesDrawn each frame
+        facesDrawn = 0;
+        
         BeginDrawing();
             ClearBackground(SKYBLUE);
             BeginMode3D(player.camera);
@@ -114,55 +92,46 @@ int main(void) {
                     nearbyChunkCount = 0;
                 }
                 for (int i = 0; i < nearbyChunkCount; i++) {
-                    Chunk* chunk = get_chunk(&chunkTable, cx, cy, cz);
+                    int chunk_cx = (int)nearbyChunks[i].x;
+                    int chunk_cy = (int)nearbyChunks[i].y;
+                    int chunk_cz = (int)nearbyChunks[i].z;
+                    
+                    Chunk* chunk = get_chunk(&chunkTable, chunk_cx, chunk_cy, chunk_cz);
                     
                     if (chunk == NULL) {
-                        // If it's a new location, create the job and request it
-                        Job* job = create_job(&chunkTable, cx, cy, cz);
-                        if (job) {
-                            job_push(job);
-                            cnd_signal(&job_available); // Wake up a worker!
-                        }
-                    } else if (chunk->state == CHUNK_STATE_READY) {
-                        // Draw the chunk only if its mesh has been uploaded
+                        // FIX: Use the new request_chunk_job that handles deduplication
+                        request_chunk_job(&chunkTable, chunk_cx, chunk_cy, chunk_cz);
+                    } else if (chunk->state == CHUNK_STATE_READY || chunk->state == CHUNK_STATE_REGENERATING) {
+                        // Draw chunks that are ready OR regenerating (still have valid old mesh)
+                        // FIX: Count faces for display
+                        facesDrawn += chunk->grassMesh.triangleCount / 2;
+                        facesDrawn += chunk->dirtMesh.triangleCount / 2;
+                        facesDrawn += chunk->stoneMesh.triangleCount / 2;
+                        
                         DrawModel(chunk->grassModel, chunk->world_pos, 1.0f, WHITE);
                         DrawModel(chunk->dirtModel, chunk->world_pos, 1.0f, WHITE);
                         DrawModel(chunk->stoneModel, chunk->world_pos, 1.0f, WHITE);
                     }
-
-
-                    //targetBlock = RayCastTargetBlock(&camera, &chunkTable);
-                    DrawCubeWiresV(
-                        (Vector3) { 
-                            player.targetBlockWorld.x + 0.5f, 
-                            player.targetBlockWorld.y + 0.5f, 
-                            player.targetBlockWorld.z + 0.5f }, 
-                        (Vector3) { 1.0f, 1.0f, 1.0f }, 
-                        PINK);
-
                 }
 
+                // Draw target block highlight
+                DrawCubeWiresV(
+                    (Vector3) { 
+                        player.targetBlockWorld.x + 0.5f, 
+                        player.targetBlockWorld.y + 0.5f, 
+                        player.targetBlockWorld.z + 0.5f }, 
+                    (Vector3) { 1.0f, 1.0f, 1.0f }, 
+                    PINK);
 
             EndMode3D();
 
             // crosshairs
             DrawLine(GetScreenWidth() / 2, GetScreenHeight() / 2 - 10, GetScreenWidth() / 2, GetScreenHeight() / 2 + 10, WHITE);
             DrawLine(GetScreenWidth() / 2 - 10, GetScreenHeight() / 2, GetScreenWidth() / 2 + 10, GetScreenHeight() / 2, WHITE);
-            //DrawText(TextFormat("current chunk coords: x:%d, y:%d, z:%d ", current_chunk->world_pos.x, current_chunk->world_pos.y, current_chunk->world_pos.z), 190, 200, 20, LIGHTGRAY);
-            //DrawText(TextFormat("current block coords: x:%d, y:%d, z:%d ", current_chunk->blocks[0]->x, current_chunk->pos.y, current_chunk->pos.z), 190, 200, 20, LIGHTGRAY);
+            
             DrawText(TextFormat("player coords: x:%.2f, y:%.2f, z:%.2f ", player.camera.position.x, player.camera.position.y, player.camera.position.z), 100, 8, 20, LIGHTGRAY);
-            //DrawText(TextFormat("cx:%d cy:%d cz:%d", cx,cy,cz), 450, 20, 20, WHITE);
-
             DrawText(TextFormat("faces rendered: %d", facesDrawn), 650, 20, 20, LIGHTGRAY);
-            //DrawText(TextFormat("current_chunk x: %.2f", current_chunk->table_pos.x), 10, 100, 20, LIGHTGRAY);
-            //DrawText(TextFormat("target block x: %.2f, target block y: %.2f, target block z: %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 10, 150, 20, LIGHTGRAY);
-
             DrawText(TextFormat("target block: %.2f, %.2f, %.2f", player.targetBlockWorld.x, player.targetBlockWorld.y, player.targetBlockWorld.z), 650, 60, 20, LIGHTGRAY);
-            //DrawText(TextFormat("target block type: %d", blocksRendered), 650, 20, 20, LIGHTGRAY);
-
-            //blocksRendered = 0;
-
-
 
             DrawFPS(10, 10);
         EndDrawing();
@@ -178,13 +147,13 @@ int main(void) {
     cnd_destroy(&job_available);
     mtx_destroy(&result_mutex);
     cnd_destroy(&result_ready);
+    mtx_destroy(&chunk_table_mutex);
 
     UnloadTexture(stoneTex);
     UnloadTexture(dirtTex);
     UnloadTexture(grassTex);
 
-    void CleanupChunkTable(ChunkTable* table);
-
+    CleanupChunkTable(&chunkTable);
 
     CloseWindow();
 

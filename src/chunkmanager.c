@@ -1,34 +1,40 @@
 #include "include.h"
 
 Vector3 nearbyChunks [NEARBY_CHUNK_ARRAY_SIZE]; 
-//int nearbyChunkCount = ((CHUNK_RENDER_MAX * 2) + 1) ^ 3; //this is bitwise OR lol
 int nearbyChunkCount = NEARBY_CHUNK_ARRAY_SIZE;
 
-//hash_index takes the resut of the hash function, and makes it a number that can fit in my hash table.
 size_t hash_index(uint64_t key) {
     return key % HASH_TABLE_SIZE;
 }
 
-//saves chunk in chunk table using hash index (which we get after getting hash)
-//will save new chunk entry as new node in linked list at appropriate bucket index
 void add_chunk(ChunkTable* table, int cx, int cy, int cz, Chunk* chunk) {
-    mtx_lock(&chunk_table_mutex); //ADDING MUTEX LOCKS
-    /* create new node (chunk entry) */
+    mtx_lock(&chunk_table_mutex);
+    
+    // Check if chunk already exists to avoid duplicates
+    uint64_t key = chunk_hash(cx, cy, cz);
+    int index = hash_index(key);
+    ChunkEntry *existing = table->buckets[index];
+    while(existing != NULL) {
+        if(existing->key == key) {
+            // Chunk already exists, don't add duplicate
+            mtx_unlock(&chunk_table_mutex);
+            return;
+        }
+        existing = existing->next_chunk_entry;
+    }
+    
     ChunkEntry* new_entry = (ChunkEntry*)malloc(sizeof(ChunkEntry));
     if (!new_entry) {
-        //here i need to handle memory allocation failure
+        mtx_unlock(&chunk_table_mutex);
         return;
     }
-    new_entry->key = chunk_hash(cx, cy, cz);
+    new_entry->key = key;
     new_entry->cx = cx;
     new_entry->cy = cy;
     new_entry->cz = cz;
     new_entry->chunk = chunk;
     new_entry->next_chunk_entry = NULL;
 
-    /* get index for hashtable, place new entry at head of index's linked list */
-    int index = hash_index(new_entry->key);
-    
     new_entry->next_chunk_entry = table->buckets[index];
     table->buckets[index] = new_entry;
     mtx_unlock(&chunk_table_mutex);
@@ -36,15 +42,14 @@ void add_chunk(ChunkTable* table, int cx, int cy, int cz, Chunk* chunk) {
 
 Chunk *get_chunk(ChunkTable* table, int cx, int cy, int cz) {
     mtx_lock(&chunk_table_mutex);
-    /* since I know the cx,cy,cz coords I can recreate the hash and find the correct index */
     uint64_t key = chunk_hash(cx, cy, cz);
     int index = hash_index(key);
-    /* I need to cycle through the chunk entries at index til I find the right key */
     ChunkEntry *current_entry = table->buckets[index];
     while(current_entry != NULL) {
         if(current_entry->key == key) {
-            // keep an eye on this, should be fine
-            return current_entry->chunk;
+            Chunk* result = current_entry->chunk;
+            mtx_unlock(&chunk_table_mutex);
+            return result;
         }
         current_entry = current_entry->next_chunk_entry;
     }
@@ -52,25 +57,39 @@ Chunk *get_chunk(ChunkTable* table, int cx, int cy, int cz) {
     return NULL;
 }
 
+// Non-locking version for use when mutex is already held
+Chunk *get_chunk_unlocked(ChunkTable* table, int cx, int cy, int cz) {
+    uint64_t key = chunk_hash(cx, cy, cz);
+    int index = hash_index(key);
+    ChunkEntry *current_entry = table->buckets[index];
+    while(current_entry != NULL) {
+        if(current_entry->key == key) {
+            return current_entry->chunk;
+        }
+        current_entry = current_entry->next_chunk_entry;
+    }
+    return NULL;
+}
+
 void remove_chunk(ChunkTable* table, int cx, int cy, int cz) {
     mtx_lock(&chunk_table_mutex);
-    /* the goal here is to find the key using the coords, get the index, find the right chunk 
-        entry, and connect the nodes on either side of it to remove it */
     uint64_t key = chunk_hash(cx, cy, cz);
     int index = hash_index(key);
 
     ChunkEntry *current_entry = table->buckets[index];
-    //key not present in the linked list?
-    if (current_entry == NULL) return;
+    if (current_entry == NULL) {
+        mtx_unlock(&chunk_table_mutex);
+        return;
+    }
 
-    //handle head node 
     if(current_entry->key == key) {
         table->buckets[index] = current_entry->next_chunk_entry;
         free(current_entry->chunk);
         free(current_entry);
+        mtx_unlock(&chunk_table_mutex);
         return;
     }
-    //not head node? let's keep track of old nodes to link to next node should we find the matching key
+    
     ChunkEntry *prev = current_entry;
     current_entry = current_entry->next_chunk_entry;
     while(current_entry != NULL) {
@@ -78,6 +97,7 @@ void remove_chunk(ChunkTable* table, int cx, int cy, int cz) {
             prev->next_chunk_entry = current_entry->next_chunk_entry;
             free(current_entry->chunk);
             free(current_entry);
+            mtx_unlock(&chunk_table_mutex);
             return;
         }
         prev = current_entry;
@@ -88,48 +108,23 @@ void remove_chunk(ChunkTable* table, int cx, int cy, int cz) {
 
 Chunk* create_chunk(Job* job) {
     Chunk* new_chunk = (Chunk*)malloc(sizeof(Chunk));
-    // for (int x = 0; x < CHUNK_SIZE; x++) {
-    //     for (int y = 0; y < CHUNK_SIZE; y++) {
-    //         for (int z = 0; z < CHUNK_SIZE; z++) {
-    //             new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
-    //             new_chunk.blocks[x][y][z].pos = (Vector3) { 
-    //                 x + (cx * CHUNK_SIZE), 
-    //                 (0 - y) + (cy * CHUNK_SIZE), 
-    //                 z + (cz * CHUNK_SIZE)};
-    //         }
-    //     }
-    // }
-    
-    // !!! CRITICAL FIX 1: Add malloc check AND zero-initialize the chunk
-    //if (new_chunk == NULL) return; !!! return to fix this <---
-    memset(new_chunk, 0, sizeof(Chunk)); // <--- THIS IS KEY! Zero-out all members (especially Meshes/Models)
+    memset(new_chunk, 0, sizeof(Chunk));
     new_chunk->table_pos = (Vector3) { job->cx, job->cy, job->cz };
     new_chunk->world_pos = (Vector3) { job->cx * CHUNK_SIZE, (job->cy * CHUNK_SIZE), job->cz * CHUNK_SIZE };
-    /* This is interesting. Cubes in raylib have their origin in the center, so I need to account for that when
-        placing blocks inside chunks. The first chunk will have the center at (0,0,0), so I need to start at (-8,0,0)
-        and end at (8,0,0). But the problem is that those blocks are also drawn from center, so I actually need to 
-        compensate for that */
+    
     float baseX = -(CHUNK_SIZE / 2) + 0.5f;
     float baseY = -(CHUNK_SIZE / 2) + 0.5f;
     float baseZ = -(CHUNK_SIZE / 2) + 0.5f;
     for (int x = 0; x < CHUNK_SIZE; x++) {
         for (int y = 0; y < CHUNK_SIZE; y++) {
             for (int z = 0; z < CHUNK_SIZE; z++) {
-               
                 new_chunk->blocks[x][y][z].pos = (Vector3) { 
                     new_chunk->world_pos.x + baseX, 
                     new_chunk->world_pos.y + baseY, 
                     new_chunk->world_pos.z + baseZ };
 
-                // if (new_chunk.blocks[x][y][z].pos.y <= 0) {
-                //     new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
-                // } else {
-                //     new_chunk.blocks[x][y][z].blockType = BLOCK_AIR;
-                // }
-                /* I need to use absolute integer values for deciding block type, esp. for noise sampling in future */
                 int absolute_x = (job->cx * CHUNK_SIZE) + x - HALF_CHUNK;
                 int absolute_y = (job->cy * CHUNK_SIZE) + y - (HALF_CHUNK - 1);
-                //int absolute_y = (cy * CHUNK_SIZE) + y - HALF_CHUNK - HALF_CHUNK;
                 int absolute_z = (job->cz * CHUNK_SIZE) + z - HALF_CHUNK;
                 new_chunk->blocks[x][y][z].blockType = DecideBlockType(new_chunk, absolute_x, absolute_y, absolute_z);
 
@@ -142,94 +137,14 @@ Chunk* create_chunk(Job* job) {
         baseX++;
     }
 
-    //InitChunkMesh(job->table, new_chunk);
-
-    //add_chunk(job->table, job->cx, job->cy, job->cz, new_chunk);
-
     return new_chunk;
 }
 
-// void create_chunk(ChunkTable* table, int cx, int cy, int cz) {
-//     Chunk* new_chunk = (Chunk*)malloc(sizeof(Chunk));
-//     // for (int x = 0; x < CHUNK_SIZE; x++) {
-//     //     for (int y = 0; y < CHUNK_SIZE; y++) {
-//     //         for (int z = 0; z < CHUNK_SIZE; z++) {
-//     //             new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
-//     //             new_chunk.blocks[x][y][z].pos = (Vector3) { 
-//     //                 x + (cx * CHUNK_SIZE), 
-//     //                 (0 - y) + (cy * CHUNK_SIZE), 
-//     //                 z + (cz * CHUNK_SIZE)};
-//     //         }
-//     //     }
-//     // }
-    
-//     // !!! CRITICAL FIX 1: Add malloc check AND zero-initialize the chunk
-//     if (new_chunk == NULL) return; 
-//     memset(new_chunk, 0, sizeof(Chunk)); // <--- THIS IS KEY! Zero-out all members (especially Meshes/Models)
-//     new_chunk->table_pos = (Vector3) { cx, cy, cz };
-//     new_chunk->world_pos = (Vector3) { cx * CHUNK_SIZE, (cy * CHUNK_SIZE), cz * CHUNK_SIZE };
-//     /* This is interesting. Cubes in raylib have their origin in the center, so I need to account for that when
-//         placing blocks inside chunks. The first chunk will have the center at (0,0,0), so I need to start at (-8,0,0)
-//         and end at (8,0,0). But the problem is that those blocks are also drawn from center, so I actually need to 
-//         compensate for that */
-//     float baseX = -(CHUNK_SIZE / 2) + 0.5f;
-//     float baseY = -(CHUNK_SIZE / 2) + 0.5f;
-//     float baseZ = -(CHUNK_SIZE / 2) + 0.5f;
-//     for (int x = 0; x < CHUNK_SIZE; x++) {
-//         for (int y = 0; y < CHUNK_SIZE; y++) {
-//             for (int z = 0; z < CHUNK_SIZE; z++) {
-               
-//                 new_chunk->blocks[x][y][z].pos = (Vector3) { 
-//                     new_chunk->world_pos.x + baseX, 
-//                     new_chunk->world_pos.y + baseY, 
-//                     new_chunk->world_pos.z + baseZ };
-
-//                 // if (new_chunk.blocks[x][y][z].pos.y <= 0) {
-//                 //     new_chunk.blocks[x][y][z].blockType = BLOCK_DIRT;
-//                 // } else {
-//                 //     new_chunk.blocks[x][y][z].blockType = BLOCK_AIR;
-//                 // }
-//                 /* I need to use absolute integer values for deciding block type, esp. for noise sampling in future */
-//                 int absolute_x = (cx * CHUNK_SIZE) + x - HALF_CHUNK;
-//                 int absolute_y = (cy * CHUNK_SIZE) + y - (HALF_CHUNK - 1);
-//                 //int absolute_y = (cy * CHUNK_SIZE) + y - HALF_CHUNK - HALF_CHUNK;
-//                 int absolute_z = (cz * CHUNK_SIZE) + z - HALF_CHUNK;
-//                 new_chunk->blocks[x][y][z].blockType = DecideBlockType(new_chunk, absolute_x, absolute_y, absolute_z);
-
-//                 baseZ++;
-//             }
-//             baseZ = -(CHUNK_SIZE / 2) + 0.5f;
-//             baseY++;
-//         }
-//         baseY = -(CHUNK_SIZE / 2) + 0.5f;
-//         baseX++;
-//     }
-
-//     InitChunkMesh(table, new_chunk);
-
-//     add_chunk(table, cx, cy, cz, new_chunk);
-
-//     return;
-// }
-
 Chunk *get_current_chunk(ChunkTable *table, int cx, int cy, int cz) {
-    
     Chunk *chunk = get_chunk(table, cx, cy, cz);
     if (chunk == NULL) {
-
-        //create_chunk(table, cx, cy, cz);
-        Job* job = create_job(table, cx, cy, cz);
-        mtx_lock(&queue_mutex);
-        job_push(job);
-        cnd_signal(&job_available);
-        mtx_unlock(&queue_mutex);
-
-
-        chunk = get_chunk(table, cx, cy, cz);
-        //and if it fails:
-        if (chunk == NULL) {
-            return NULL;
-        }
+        request_chunk_job(table, cx, cy, cz);
+        return NULL;
     }
     return chunk;
 }
@@ -241,7 +156,6 @@ void UpdateNearbyChunks(int cx, int cy, int cz) {
         for (int y = -CHUNK_RENDER_MAX + cy; y <= CHUNK_RENDER_MAX + cy; y++) {
             for (int z = -CHUNK_RENDER_MAX + cz; z <= CHUNK_RENDER_MAX + cz; z++) {
                 nearbyChunks[tracker++] = (Vector3) { x, y, z };
-                //tracker++;
             }
         }
     }
@@ -254,125 +168,193 @@ void CleanupChunkTable(ChunkTable* table) {
         while (entry != NULL) {
             ChunkEntry* next = entry->next_chunk_entry;
             
-            // 1. Unload and Free the Mesh/Model data
             if (entry->chunk) {
-                UnloadMesh(entry->chunk->grassMesh);
-                UnloadMesh(entry->chunk->dirtMesh);
-                UnloadMesh(entry->chunk->stoneMesh);
-                
-                UnloadModel(entry->chunk->grassModel);
-                UnloadModel(entry->chunk->dirtModel);
-                UnloadModel(entry->chunk->stoneModel);
+                if (entry->chunk->grassModel.meshCount > 0) {
+                    UnloadModel(entry->chunk->grassModel);
+                }
+                if (entry->chunk->dirtModel.meshCount > 0) {
+                    UnloadModel(entry->chunk->dirtModel);
+                }
+                if (entry->chunk->stoneModel.meshCount > 0) {
+                    UnloadModel(entry->chunk->stoneModel);
+                }
                 
                 free(entry->chunk);
             }
             
-            // 2. Free the ChunkEntry struct
             free(entry);
             entry = next;
         }
     }
 }
 
-void ProcessChunkResults() {
-    // Pop results from the queue until it's empty
-    JobResult* result = result_pop(); 
-    while (result != NULL) {
-        Chunk* chunk = result->chunk;
-        
-        if (chunk) {
-            // --- GPU-SAFE MESH UPLOAD ---
-            // 1. Upload Grass Mesh
-            FinalizeAndUploadMesh(&chunk->grassMesh, &chunk->grassModel, 
-                                 result->grass_vertices, result->grass_normals, result->grass_uvs, 
-                                 result->grass_colors, result->grass_vert_count, grassTex);
-            
-            // 2. Upload Dirt Mesh
-            FinalizeAndUploadMesh(&chunk->dirtMesh, &chunk->dirtModel, 
-                                 result->dirt_vertices, result->dirt_normals, result->dirt_uvs, 
-                                 result->dirt_colors, result->dirt_vert_count, dirtTex);
-            
-            // 3. Upload Stone Mesh
-            FinalizeAndUploadMesh(&chunk->stoneMesh, &chunk->stoneModel, 
-                                 result->stone_vertices, result->stone_normals, result->stone_uvs, 
-                                 result->stone_colors, result->stone_vert_count, stoneTex);
-                                 
-            // The memory for the raw buffers (result->*_vertices, etc.) is now freed 
-            // inside FinalizeAndUploadMesh, as per your meshmanager.c implementation.
+// Queue for models that need to be unloaded on the main thread
+typedef struct DeferredUnload {
+    Model grass;
+    Model dirt;
+    Model stone;
+    struct DeferredUnload* next;
+} DeferredUnload;
 
-            chunk->state = CHUNK_STATE_READY; // Flag chunk as safe to draw!
-            
-            // Add the chunk to the world table (if not already done in create_chunk)
-            // If create_chunk handles the add_chunk call, this is skipped.
-            // add_chunk(result->table, result->cx, result->cy, result->cz, chunk); 
-        }
+static DeferredUnload* deferred_unload_head = NULL;
+static mtx_t deferred_unload_mutex;
+static bool deferred_unload_initialized = false;
 
-        // Clean up the JobResult wrapper
-        free(result);
+void InitDeferredUnload(void) {
+    if (!deferred_unload_initialized) {
+        mtx_init(&deferred_unload_mutex, mtx_plain);
+        deferred_unload_initialized = true;
+    }
+}
+
+void QueueDeferredUnload(Model grass, Model dirt, Model stone) {
+    DeferredUnload* item = (DeferredUnload*)malloc(sizeof(DeferredUnload));
+    if (!item) return;
+    
+    item->grass = grass;
+    item->dirt = dirt;
+    item->stone = stone;
+    
+    mtx_lock(&deferred_unload_mutex);
+    item->next = deferred_unload_head;
+    deferred_unload_head = item;
+    mtx_unlock(&deferred_unload_mutex);
+}
+
+void ProcessDeferredUnloads(void) {
+    mtx_lock(&deferred_unload_mutex);
+    DeferredUnload* item = deferred_unload_head;
+    deferred_unload_head = NULL;
+    mtx_unlock(&deferred_unload_mutex);
+    
+    while (item) {
+        DeferredUnload* next = item->next;
         
-        // Get the next result
-        result = result_pop();
+        if (item->grass.meshCount > 0) UnloadModel(item->grass);
+        if (item->dirt.meshCount > 0) UnloadModel(item->dirt);
+        if (item->stone.meshCount > 0) UnloadModel(item->stone);
+        
+        free(item);
+        item = next;
     }
 }
 
 void ProcessJobResults(ChunkTable* table) {
     JobResult* result = result_pop();
     while(result != NULL) {
+        Chunk* target_chunk = NULL;
+        bool should_update_neighbors = false;
         
-        Chunk* worker_chunk = result->chunk;
-        
-        // Find the chunk that is currently in the table (if any)
-        Chunk* target_chunk = get_chunk(result->table, result->cx, result->cy, result->cz);
-
-        if (target_chunk == NULL) {
-            // Case 1: The chunk is NOT in the table. This means the worker's chunk is the one we want.
-            add_chunk(result->table, result->cx, result->cy, result->cz, worker_chunk);
-            target_chunk = worker_chunk; // Target chunk is the newly added worker chunk
+        if (result->is_new_chunk) {
+            // NEW CHUNK: Add the worker's chunk to the table
+            Chunk* worker_chunk = result->chunk;
+            
+            // Double-check it wasn't added by another thread
+            Chunk* existing = get_chunk(table, result->cx, result->cy, result->cz);
+            if (existing == NULL) {
+                add_chunk(table, result->cx, result->cy, result->cz, worker_chunk);
+                target_chunk = worker_chunk;
+                should_update_neighbors = true;
+            } else {
+                // Race condition: chunk was added by someone else, free ours
+                free(worker_chunk);
+                target_chunk = existing;
+            }
         } else {
-            // Case 2: The chunk IS in the table (e.g., a placeholder, or a chunk we are regenerating).
-            // The existing chunk must receive the new mesh data.
-            
-            // CRITICAL FIX: The existing chunk (target_chunk) in the table needs the block data
-            // that the worker just generated. Copy it over.
-            // This is necessary if the chunk was a placeholder and the worker filled the data.
-            memcpy(target_chunk->blocks, worker_chunk->blocks, sizeof(target_chunk->blocks));
-            target_chunk->world_pos = worker_chunk->world_pos;
-            target_chunk->table_pos = worker_chunk->table_pos;
-
-            // The worker's chunk struct is now redundant. Free its memory.
-            // Assuming DestroyChunk frees any sub-allocations within the Chunk struct itself.
-            // If create_chunk only uses malloc, you only need free(worker_chunk).
-            free(worker_chunk);
-            
-            // target_chunk is already set to the chunk in the table.
+            // REGENERATION: Use existing chunk (result->chunk points to it)
+            target_chunk = result->chunk;
         }
         
-        // At this point, `target_chunk` is guaranteed to be the *correct* pointer (the one in the table).
+        if (target_chunk) {
+            // FIX: Build new meshes into TEMPORARY variables first
+            // This way the chunk's actual mesh/model pointers stay valid
+            // until we do a single atomic swap at the end
+            
+            Mesh new_grassMesh = {0};
+            Mesh new_dirtMesh = {0};
+            Mesh new_stoneMesh = {0};
+            Model new_grassModel = {0};
+            Model new_dirtModel = {0};
+            Model new_stoneModel = {0};
+            
+            // Upload new meshes into temporaries
+            FinalizeAndUploadMesh(&new_grassMesh, &new_grassModel, 
+                                 result->grass_vertices, result->grass_normals, result->grass_uvs, 
+                                 result->grass_colors, result->grass_vert_count, grassTex);
+            
+            FinalizeAndUploadMesh(&new_dirtMesh, &new_dirtModel, 
+                                 result->dirt_vertices, result->dirt_normals, result->dirt_uvs, 
+                                 result->dirt_colors, result->dirt_vert_count, dirtTex);
+            
+            FinalizeAndUploadMesh(&new_stoneMesh, &new_stoneModel, 
+                                 result->stone_vertices, result->stone_normals, result->stone_uvs, 
+                                 result->stone_colors, result->stone_vert_count, stoneTex);
+            
+            // Store old models for cleanup
+            Model old_grass = target_chunk->grassModel;
+            Model old_dirt = target_chunk->dirtModel;
+            Model old_stone = target_chunk->stoneModel;
+            bool had_old_models = (old_grass.meshCount > 0 || 
+                                   old_dirt.meshCount > 0 || 
+                                   old_stone.meshCount > 0);
+            
+            // ATOMIC SWAP: Replace all mesh/model pointers at once
+            // After this point, rendering will use the new meshes
+            target_chunk->grassMesh = new_grassMesh;
+            target_chunk->dirtMesh = new_dirtMesh;
+            target_chunk->stoneMesh = new_stoneMesh;
+            target_chunk->grassModel = new_grassModel;
+            target_chunk->dirtModel = new_dirtModel;
+            target_chunk->stoneModel = new_stoneModel;
+            
+            // NOW safe to unload old models (new ones are active)
+            if (had_old_models) {
+                if (old_grass.meshCount > 0) UnloadModel(old_grass);
+                if (old_dirt.meshCount > 0) UnloadModel(old_dirt);
+                if (old_stone.meshCount > 0) UnloadModel(old_stone);
+            }
+                                     
+            target_chunk->state = CHUNK_STATE_READY;
+            
+            // FIX: Check if another remesh was requested while we were working
+            if (target_chunk->needsRemesh) {
+                target_chunk->needsRemesh = false;
+                RegenerateChunk(table, target_chunk);
+            }
+            
+            // If this was a new chunk, neighbors need to update their boundary faces
+            if (should_update_neighbors) {
+                int cx = result->cx;
+                int cy = result->cy;
+                int cz = result->cz;
+                
+                // Check each neighbor - if they exist, they need to remesh
+                // FIX: Also regenerate chunks that are REGENERATING (they'll get needsRemesh set)
+                Chunk* neighbor;
+                
+                #define MAYBE_REGEN(n) do { \
+                    if ((n) && ((n)->state == CHUNK_STATE_READY || (n)->state == CHUNK_STATE_REGENERATING)) \
+                        RegenerateChunk(table, (n)); \
+                } while(0)
+                
+                neighbor = get_chunk(table, cx - 1, cy, cz);
+                MAYBE_REGEN(neighbor);
+                neighbor = get_chunk(table, cx + 1, cy, cz);
+                MAYBE_REGEN(neighbor);
+                neighbor = get_chunk(table, cx, cy - 1, cz);
+                MAYBE_REGEN(neighbor);
+                neighbor = get_chunk(table, cx, cy + 1, cz);
+                MAYBE_REGEN(neighbor);
+                neighbor = get_chunk(table, cx, cy, cz - 1);
+                MAYBE_REGEN(neighbor);
+                neighbor = get_chunk(table, cx, cy, cz + 1);
+                MAYBE_REGEN(neighbor);
+                
+                #undef MAYBE_REGEN
+            }
+        }
         
-        // 1. Upload Grass Mesh
-        // NOTE: ALL uploads and state updates must now target target_chunk, not result->chunk.
-        FinalizeAndUploadMesh(&target_chunk->grassMesh, &target_chunk->grassModel, 
-                             result->grass_vertices, result->grass_normals, result->grass_uvs, 
-                             result->grass_colors, result->grass_vert_count, grassTex);
-        
-        // 2. Upload Dirt Mesh
-        FinalizeAndUploadMesh(&target_chunk->dirtMesh, &target_chunk->dirtModel, 
-                             result->dirt_vertices, result->dirt_normals, result->dirt_uvs, 
-                             result->dirt_colors, result->dirt_vert_count, dirtTex);
-        
-        // 3. Upload Stone Mesh
-        FinalizeAndUploadMesh(&target_chunk->stoneMesh, &target_chunk->stoneModel, 
-                             result->stone_vertices, result->stone_normals, result->stone_uvs, 
-                             result->stone_colors, result->stone_vert_count, stoneTex);
-                                 
-        // Update the state of the chunk *in the table*
-        target_chunk->state = CHUNK_STATE_READY; // Flag chunk as safe to draw!
-        
-        // Clean up the JobResult wrapper (which is outside the chunk struct)
         free(result);
-        
-        // Get the next result
         result = result_pop();
     }
 }
-

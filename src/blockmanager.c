@@ -4,14 +4,11 @@
 bool IsBlockAir(ChunkTable* chunkTable, Chunk* chunk, int x, int y, int z) {
     if (!chunk) return false; //treat null chunks as NOT air, so we don't draw extra faces
 
-    // if x y or z are outsize current chunk...
+    // if x y or z are outside current chunk...
     if (x < 0 || x >= CHUNK_SIZE ||
         y < 0 || y >= CHUNK_SIZE ||
         z < 0 || z >= CHUNK_SIZE) {
 
-        //return false;
-        
-        // fixed this; needed to sub half chunk to get real world coords, whoops 
         int worldX = chunk->world_pos.x + x - HALF_CHUNK;
         int worldY = chunk->world_pos.y + y - HALF_CHUNK;
         int worldZ = chunk->world_pos.z + z - HALF_CHUNK;
@@ -22,7 +19,10 @@ bool IsBlockAir(ChunkTable* chunkTable, Chunk* chunk, int x, int y, int z) {
 
         Chunk* targetChunk = get_chunk(chunkTable, chunkX, chunkY, chunkZ);
 
-        if (!targetChunk) return true;
+        // FIX: If neighbor chunk doesn't exist, treat as NOT air (solid)
+        // This prevents drawing faces at chunk boundaries into unloaded areas
+        // The face will be added later when the neighbor chunk loads and gets meshed
+        if (!targetChunk) return false;
 
         int blockX = worldX - (int)floor(targetChunk->world_pos.x) + HALF_CHUNK;
         int blockY = worldY - (int)floor(targetChunk->world_pos.y) + HALF_CHUNK;
@@ -54,12 +54,12 @@ BlockType DecideBlockType(Chunk* new_chunk, int absolute_x, int absolute_y, int 
 
     // caves
     bool isCave = false;
-    float squash = 0.5;
-    float noise_y = absolute_y * squash;
+    float squash = 0.6;
+    float noise_y = absolute_y / squash;
     if (absolute_y - 4 < groundHeight) {
         float caveVal = fnlGetNoise3D(&GLOBAL_NOISE_3D, (float)absolute_x, noise_y, (float)absolute_z);
 
-        if (caveVal > 0.7f) {
+        if (caveVal > 0.85f) {
             isCave = true;
         }
 
